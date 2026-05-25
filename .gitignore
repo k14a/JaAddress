@@ -1,0 +1,69 @@
+# ================================
+# .NET Core / .NET 9
+# ================================
+
+# ビルド出力
+bin/
+obj/
+out/
+
+# VS Code / Rider
+.vscode/
+.idea/
+
+# ユーザー設定
+*.user
+*.suo
+*.userprefs
+
+# Mac 系
+.DS_Store
+
+# Windows 系
+Thumbs.db
+desktop.ini
+
+# NuGet
+*.nupkg
+*.snupkg
+*.nuspec
+*.nupkg.sha512
+.nuget/
+packages/
+
+# ログ・トレース
+*.log
+*.tlog
+
+# dotnet CLI キャッシュ
+project.lock.json
+project.fragment.lock.json
+
+# Rider / JetBrains
+*.ReSharper
+_ReSharper*/
+*.DotSettings.user
+
+# Test 結果や実行履歴
+TestResults/
+*.coverage
+*.coveragexml
+*.trx
+__snapshots__/
+__mismatch__/
+
+# アップロード禁止な個人設定
+TestConfig.json
+appsettings.*.json
+
+# その他環境依存
+*.vs/
+*.swp
+*.bak
+*.orig
+*.tmp
+
+# コンテナ / Devcontainers（必要に応じて）
+.devcontainer/
+Dockerfile
+docker-compose.*
