@@ -63,6 +63,9 @@ appsettings.*.json
 *.orig
 *.tmp
 
+# データ
+data/
+
 # コンテナ / Devcontainers（必要に応じて）
 .devcontainer/
 Dockerfile

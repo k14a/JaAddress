@@ -1,0 +1,156 @@
+﻿using JaAddress.Core.Services;
+using JaAddress.Core.Tests.Fixtures;
+
+namespace JaAddress.Core.Tests;
+
+public sealed class AddressServiceTests(AddressServiceFixture fixture)
+    : IClassFixture<AddressServiceFixture> {
+
+    private readonly IAddressService _sut = fixture.AddressService;
+
+    // -------------------------------------------------------
+    // GetPrefecturesAsync
+    // -------------------------------------------------------
+    [Fact]
+    public async Task GetPrefecturesAsync_正常系_都道府県一覧を返す() {
+        var result = await this._sut.GetPrefecturesAsync();
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Name == "東京都");
+        Assert.Contains(result, p => p.Name == "大阪府");
+    }
+
+    [Fact]
+    public async Task GetPrefecturesAsync_座標が正しく変換される() {
+        var result = await this._sut.GetPrefecturesAsync();
+        var tokyo = result.Single(p => p.Name == "東京都");
+
+        Assert.Equal(139.6917m, tokyo.Longitude);
+        Assert.Equal(35.6895m, tokyo.Latitude);
+    }
+
+    // -------------------------------------------------------
+    // GetCitiesAsync
+    // -------------------------------------------------------
+    [Fact]
+    public async Task GetCitiesAsync_正常系_市区町村一覧を返す() {
+        var result = await this._sut.GetCitiesAsync("東京都");
+
+        Assert.Equal(3, result.Count);
+        Assert.Contains(result, c => c.Name == "新宿区");
+        Assert.Contains(result, c => c.Name == "千代田区");
+        Assert.Contains(result, c => c.Name == "八王子市");
+    }
+
+    [Fact]
+    public async Task GetCitiesAsync_Wardあり_DisplayNameが結合される() {
+        var result = await this._sut.GetCitiesAsync("大阪府");
+
+        var city = result.First(c => c.Ward == "北区");
+        Assert.Equal("大阪市北区", city.DisplayName);
+    }
+
+    [Fact]
+    public async Task GetCitiesAsync_存在しない都道府県_例外をスローする() {
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => this._sut.GetCitiesAsync("存在しない県"));
+    }
+
+    // -------------------------------------------------------
+    // GetTownsAsync
+    // -------------------------------------------------------
+    [Fact]
+    public async Task GetTownsAsync_正常系_町字一覧を返す() {
+        var result = await this._sut.GetTownsAsync("東京都", "新宿区");
+
+        Assert.Equal(3, result.Count);
+        Assert.Contains(result, t => t.Name == "西新宿");
+        Assert.Contains(result, t => t.Name == "歌舞伎町");
+    }
+
+    [Fact]
+    public async Task GetTownsAsync_存在しない市区町村_空リストを返す() {
+        var result = await this._sut.GetTownsAsync("東京都", "存在しない区");
+
+        Assert.Empty(result);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - SplitRemainder=false（デフォルト）
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_都道府県と市区町村を特定してRemainderを返す() {
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿1丁目2-3");
+
+        Assert.NotNull(result);
+        Assert.Equal("東京都", result.Prefecture.Name);
+        Assert.Equal("新宿区", result.City.Name);
+        Assert.Equal("西新宿1丁目2-3", result.Remainder);
+        Assert.Null(result.Town);
+    }
+
+    [Fact]
+    public async Task ParseAsync_存在しない住所_nullを返す() {
+        var result = await this._sut.ParseAsync("存在しない県どこか市");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task ParseAsync_都道府県のみ_nullを返す() {
+        var result = await this._sut.ParseAsync("東京都");
+
+        Assert.Null(result);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - SplitRemainder=true
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_町字Street_Blockを分割する() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿1丁目2-3", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_町字のみ_StreetBlockがnull() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Null(result.Street);
+        Assert.Null(result.Block);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - NormalizeNumber
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_全角数字_正規化して分割する() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeNumber = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿１丁目２－３", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NormalizeNumberFalse_全角のままRemainderに残る() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeNumber = false };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿１丁目２－３", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        // 全角のままなのでStreet/Blockは分割されずRemainderに残る
+        Assert.Null(result.Street);
+        Assert.Null(result.Block);
+    }
+}
