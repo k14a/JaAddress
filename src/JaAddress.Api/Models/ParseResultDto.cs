@@ -8,5 +8,7 @@ public sealed class ParseResultDto {
     public string? Street { get; init; }
     public string? Block { get; init; }
     public string? Remainder { get; init; }
+    public int Offset { get; init; }
+    public bool Corrected { get; init; }
     public bool Success { get; init; }
 }

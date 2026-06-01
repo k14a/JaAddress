@@ -15,6 +15,8 @@ internal static class ParseDtoMapper {
                 Street     = result.Street,
                 Block      = result.Block,
                 Remainder  = result.Remainder,
+                Offset     = result.Offset,
+                Corrected  = result.Corrected,
                 Success    = true,
             };
 }

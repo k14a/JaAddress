@@ -143,6 +143,70 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     }
 
     [Fact]
+    public async Task ParseAsync_SplitRemainder_丁目省略形_chomeデータから漢字で返す() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿1-2-3", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("一丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - 住所補正（市区名省略）
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_市区名省略_ward単体でマッチしてCorrectedがtrue() {
+        var result = await this._sut.ParseAsync("大阪府北区梅田");
+
+        Assert.NotNull(result);
+        Assert.Equal("大阪府", result.Prefecture.Name);
+        Assert.Equal("大阪市北区", result.City.DisplayName);
+        Assert.True(result.Corrected);
+        Assert.Equal("梅田", result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_通常マッチ_CorrectedがFalse() {
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿");
+
+        Assert.NotNull(result);
+        Assert.False(result.Corrected);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - BestEffort（住所抽出）
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_BestEffort_先頭以外の住所を抽出してOffsetを返す() {
+        var options = new AddressParseOptions { BestEffort = true };
+        var result = await this._sut.ParseAsync("勤務地：東京都新宿区西新宿", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("東京都", result.Prefecture.Name);
+        Assert.Equal("新宿区", result.City.Name);
+        Assert.Equal("西新宿", result.Remainder);
+        Assert.Equal(4, result.Offset); // "勤務地：" = 4文字
+    }
+
+    [Fact]
+    public async Task ParseAsync_BestEffort_先頭から始まる場合Offsetは0() {
+        var options = new AddressParseOptions { BestEffort = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿", options);
+
+        Assert.NotNull(result);
+        Assert.Equal(0, result.Offset);
+    }
+
+    [Fact]
+    public async Task ParseAsync_BestEffortFalse_先頭以外の住所はnullを返す() {
+        var result = await this._sut.ParseAsync("勤務地：東京都新宿区西新宿");
+
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task ParseAsync_NormalizeNumberFalse_全角のままRemainderに残る() {
         var options = new AddressParseOptions { SplitRemainder = true, NormalizeNumber = false };
         var result = await this._sut.ParseAsync("東京都新宿区西新宿１丁目２－３", options);
