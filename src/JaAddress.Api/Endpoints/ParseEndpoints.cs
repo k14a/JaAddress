@@ -13,10 +13,10 @@ internal static class ParseEndpoints {
         // GET /parse?q=...&bestEffort=false&normalizeOaza=false
         group.MapGet("/", async (
             string q,
-            bool bestEffort,
-            bool normalizeOaza,
             IAddressService svc,
-            CancellationToken ct) => {
+            CancellationToken ct,
+            bool bestEffort = false,
+            bool normalizeOaza = false) => {
 
             var options = new AddressParseOptions {
                 SplitRemainder = true,
@@ -71,11 +71,11 @@ internal static class ParseEndpoints {
         // POST /parse/tsv?bestEffort=false&normalizeOaza=false
         group.MapPost("/tsv", async (
             IFormFile file,
-            bool bestEffort,
-            bool normalizeOaza,
             IAddressService svc,
             IOptions<ApiOptions> apiOptions,
-            CancellationToken ct) => {
+            CancellationToken ct,
+            bool bestEffort = false,
+            bool normalizeOaza = false) => {
 
             var max = apiOptions.Value.MaxTsvRows;
             await using var stream = file.OpenReadStream();
@@ -100,6 +100,7 @@ internal static class ParseEndpoints {
                 contentType: "text/tab-separated-values",
                 fileDownloadName: "result.tsv");
         })
-        .WithSummary("TSVファイルで住所を一括パースする");
+        .WithSummary("TSVファイルで住所を一括パースする")
+        .DisableAntiforgery();
     }
 }

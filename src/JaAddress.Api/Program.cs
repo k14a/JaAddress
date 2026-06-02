@@ -17,6 +17,8 @@ builder.Services.AddJaAddress(new JaAddressOptions {
     DataDirectory = dataDirectory,
 });
 
+builder.Services.AddAntiforgery();
+
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c => {
@@ -29,6 +31,8 @@ if (app.Environment.IsDevelopment()) {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+app.UseAntiforgery();
 
 // エンドポイント登録
 PrefectureEndpoints.Map(app);
