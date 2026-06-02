@@ -184,9 +184,6 @@ dotnet run --project src/JaAddress.Api
 | `JaAddress.Core` | classlib | 実装の中心。`IAddressService`・モデル・DI 登録 |
 | `JaAddress.Api` | webapi | ASP.NET Core Minimal API |
 | `JaAddress.DataBuilder` | console | Geolonia API からデータを取得する CLI |
-| `JaAddress.Domain` | classlib | 将来の拡張用スタブ |
-| `JaAddress.Application` | classlib | 将来の拡張用スタブ |
-| `JaAddress.Infrastructure` | classlib | 将来の拡張用スタブ |
 
 ---
 
