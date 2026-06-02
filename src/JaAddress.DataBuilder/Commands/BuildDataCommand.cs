@@ -65,7 +65,11 @@ internal sealed class BuildDataCommand(
             };
 
             await Parallel.ForEachAsync(pref.Cities, options, async (city, innerCt) => {
-                var cityDisplayName = city.Ward is null ? city.City : $"{city.City}{city.Ward}";
+                var cityDisplayName = city.Ward is not null
+                    ? $"{city.City}{city.Ward}"
+                    : city.County is not null
+                        ? $"{city.County}{city.City}"
+                        : city.City;
 
                 var townData = await this._downloader.GetTownsAsync(pref.Pref, cityDisplayName, innerCt);
 

@@ -11,6 +11,7 @@ internal static class ParseDtoMapper {
                 Input      = input,
                 Prefecture = result.Prefecture.Name,
                 City       = result.City.DisplayName,
+                County     = result.City.County,
                 Town       = result.Town?.Name,
                 Street     = result.Street,
                 Block      = result.Block,

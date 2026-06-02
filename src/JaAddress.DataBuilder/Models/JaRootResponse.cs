@@ -27,6 +27,7 @@ public sealed class JaPrefecture {
 /// </summary>
 public sealed class JaCity {
     public int Code { get; init; }
+    public string? County { get; init; }
     public string City { get; init; } = string.Empty;
     public string? Ward { get; init; }
     public double[] Point { get; init; } = [];

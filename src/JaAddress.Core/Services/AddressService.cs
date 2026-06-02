@@ -66,7 +66,10 @@ internal sealed class AddressService(
             .Select(c => new City {
                 Code = c.Code,
                 PrefectureName = prefName,
-                Name = c.City,
+                Name = c.Ward is not null ? $"{c.City}{c.Ward}" :
+                       c.County is not null ? $"{c.County}{c.City}" :
+                       c.City,
+                County = c.County,
                 Ward = c.Ward,
                 Latitude = c.Point.Length > 1 ? (decimal)c.Point[1] : 0m,
                 Longitude = c.Point.Length > 0 ? (decimal)c.Point[0] : 0m,
@@ -88,26 +91,15 @@ internal sealed class AddressService(
 
         var entries = await this.LoadTownEntriesAsync(prefName, cityName, ct);
 
-        if (entries.Count == 0) {
-            this._townCache[cacheKey] = [];
-            return [];
+        IReadOnlyList<Town> towns;
+        if (entries.Count > 0) {
+            towns = EntriesToTowns(prefName, cityName, entries);
+        } else {
+            // ファイルが見つからない場合は政令市（区）または郡として結合する
+            // 各サブ市区町村の GetTownsAsync を再帰的に呼び出すことで
+            // Town.CityName に正しい区・町村名がセットされる
+            towns = await this.AggregateSubCityTownsAsync(prefName, cityName, ct);
         }
-
-        var towns = entries
-            .Where(t => !string.IsNullOrEmpty(t.OazaCho))
-            .GroupBy(t => t.OazaCho!)
-            .Select(g => {
-                var pt = g.First().Point;
-                return new Town {
-                    PrefectureName = prefName,
-                    CityName = cityName,
-                    Name = g.Key,
-                    Latitude = pt is { Length: > 1 } ? (decimal)pt[1] : null,
-                    Longitude = pt is { Length: > 0 } ? (decimal)pt[0] : null,
-                };
-            })
-            .ToList()
-            .AsReadOnly();
 
         this._townCache[cacheKey] = towns;
         return towns;
@@ -153,8 +145,10 @@ internal sealed class AddressService(
             .OrderByDescending(c => c.DisplayName.Length)
             .FirstOrDefault(c => afterPref.StartsWith(c.DisplayName));
 
-        // 市区名省略の補正: "大宮区…" → ward 単体でマッチして親 city を補完
         var corrected = false;
+        Town? correctedTown = null;
+
+        // 補正1: ward省略 "北区…" → ward 単体でマッチして親 city を補完
         if (city is null) {
             city = cities
                 .Where(c => c.Ward is not null)
@@ -162,7 +156,28 @@ internal sealed class AddressService(
                 .FirstOrDefault(c => afterPref.StartsWith(c.Ward!));
             if (city is not null) {
                 corrected = true;
-                this._logger.LogDebug("市区名省略を補正しました: {Ward} → {DisplayName}", city.Ward, city.DisplayName);
+                this._logger.LogDebug("区名省略を補正しました: {Ward} → {DisplayName}", city.Ward, city.DisplayName);
+            }
+        }
+
+        // 補正2: city完全省略 "西新宿…" → 町字から市区町村を逆引き
+        if (city is null) {
+            (city, correctedTown) = await this.FindCityByTownAsync(prefecture.Name, afterPref, cities, ct);
+            if (city is not null) {
+                corrected = true;
+                this._logger.LogDebug("市区町村省略を補正しました: {Town} → {City}", correctedTown!.Name, city.DisplayName);
+            }
+        }
+
+        // 補正3: county省略 "熊取町…" → county なしで市区町村をマッチして補完
+        if (city is null) {
+            city = cities
+                .Where(c => c.County is not null)
+                .OrderByDescending(c => c.Name.Length - c.County!.Length)
+                .FirstOrDefault(c => afterPref.StartsWith(c.Name[c.County!.Length..]));
+            if (city is not null) {
+                corrected = true;
+                this._logger.LogDebug("郡名省略を補正しました: {City}", city.DisplayName);
             }
         }
 
@@ -171,10 +186,12 @@ internal sealed class AddressService(
             return null;
         }
 
-        // 補正時は ward 分だけ、通常時は DisplayName 分を消費
-        var consumedLength = corrected && city.Ward is not null
-            ? city.Ward.Length
-            : city.DisplayName.Length;
+        // 消費長: city完全省略=0、ward省略=ward長、county省略=郡名を除いた市区町村名長、通常=DisplayName長
+        var consumedLength =
+            correctedTown is not null ? 0 :
+            corrected && city.Ward is not null ? city.Ward.Length :
+            corrected && city.County is not null ? city.Name.Length - city.County.Length :
+            city.DisplayName.Length;
         var remainder = afterPref[consumedLength..];
 
         // SplitRemainder=false の場合はここで返す
@@ -189,10 +206,16 @@ internal sealed class AddressService(
         }
 
         // 町字・Street・Block を分割
-        var towns = await this.GetTownsAsync(prefecture.Name, city.Name, ct);
-        var town = towns
-            .OrderByDescending(t => t.Name.Length)
-            .FirstOrDefault(t => remainder.StartsWith(t.Name));
+        // city逆引き補正時はすでに town が確定しているため再検索しない
+        Town? town;
+        int consumedTownLength;
+        if (correctedTown is not null) {
+            town = correctedTown;
+            consumedTownLength = town.Name.Length;
+        } else {
+            var towns = await this.GetTownsAsync(prefecture.Name, city.Name, ct);
+            (town, consumedTownLength) = FindTown(remainder, towns, options.NormalizeOaza);
+        }
 
         if (town is null) {
             return new AddressParseResult {
@@ -204,7 +227,7 @@ internal sealed class AddressService(
             };
         }
 
-        var afterTown = remainder[town.Name.Length..];
+        var afterTown = remainder[consumedTownLength..];
 
         // 丁目名をデータから引くために生エントリを使う（GetTownsAsync 内でキャッシュ済み）
         var rawEntries = await this.LoadTownEntriesAsync(prefecture.Name, city.Name, ct);
@@ -219,13 +242,35 @@ internal sealed class AddressService(
             Town = town,
             Street = string.IsNullOrEmpty(street) ? null : street,
             Block = string.IsNullOrEmpty(block) ? null : block,
-            Remainder = string.IsNullOrEmpty(street) ? afterTown : string.Empty,
+            Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterTown : string.Empty,
         };
     }
 
     // -------------------------------------------------------
     // ユーティリティ
     // -------------------------------------------------------
+
+    /// <summary>
+    /// 全市区町村の町字データを順に検索し、入力文字列の先頭に一致する town を持つ city を返す。
+    /// 市区町村名が完全省略された住所の補正に使用する。
+    /// </summary>
+    private async Task<(City? City, Town? Town)> FindCityByTownAsync(
+        string prefName,
+        string input,
+        IReadOnlyList<City> cities,
+        CancellationToken ct) {
+
+        foreach (var city in cities.OrderByDescending(c => c.DisplayName.Length)) {
+            var towns = await this.GetTownsAsync(prefName, city.Name, ct);
+            var town = towns
+                .OrderByDescending(t => t.Name.Length)
+                .FirstOrDefault(t => input.StartsWith(t.Name));
+            if (town is not null) {
+                return (city, town);
+            }
+        }
+        return (null, null);
+    }
 
     /// <summary>
     /// 入力文字列中で最初に出現する都道府県名とその位置を返す。
@@ -262,6 +307,64 @@ internal sealed class AddressService(
         return result;
     }
 
+    /// <summary>TownEntry リストを Town リストに変換する。</summary>
+    private static IReadOnlyList<Town> EntriesToTowns(
+        string prefName, string cityName, IReadOnlyList<TownEntry> entries) =>
+        entries
+            .Where(t => !string.IsNullOrEmpty(t.OazaCho))
+            .GroupBy(t => t.OazaCho!)
+            .Select(g => {
+                var pt = g.First().Point;
+                return new Town {
+                    PrefectureName = prefName,
+                    CityName       = cityName,
+                    Name           = g.Key,
+                    Latitude       = pt is { Length: > 1 } ? (decimal)pt[1] : null,
+                    Longitude      = pt is { Length: > 0 } ? (decimal)pt[0] : null,
+                };
+            })
+            .ToList()
+            .AsReadOnly();
+
+    /// <summary>
+    /// 政令市名（区なし）または郡名に対してサブ市区町村の GetTownsAsync を再帰的に呼び出し
+    /// 全町字を結合して返す。Town.CityName には各区・町村名が正しくセットされる。
+    /// </summary>
+    private async Task<IReadOnlyList<Town>> AggregateSubCityTownsAsync(
+        string prefName, string baseName, CancellationToken ct) {
+
+        var jaPath = Path.Combine(this._dataDir, "ja.json");
+        var root = await LoadJsonAsync<JaRootResponse>(jaPath, ct);
+        if (root is null) { return []; }
+
+        var pref = root.Data.FirstOrDefault(p => p.Pref == prefName);
+        if (pref is null) { return []; }
+
+        // 政令市（区あり）: City == baseName && Ward != null
+        List<string> subNames = [.. pref.Cities
+            .Where(c => c.City == baseName && c.Ward is not null)
+            .Select(c => $"{c.City}{c.Ward}")];
+
+        // 郡: County == baseName
+        if (subNames.Count == 0) {
+            subNames = [.. pref.Cities
+                .Where(c => c.County == baseName)
+                .Select(c => $"{c.County}{c.City}")];
+        }
+
+        if (subNames.Count == 0) { return []; }
+
+        this._logger.LogDebug(
+            "{BaseName} のサブ市区町村 {Count} 件を結合します", baseName, subNames.Count);
+
+        var allTowns = new List<Town>();
+        foreach (var subName in subNames) {
+            var subTowns = await this.GetTownsAsync(prefName, subName, ct);
+            allTowns.AddRange(subTowns);
+        }
+        return allTowns.AsReadOnly();
+    }
+
     /// <summary>市区町村の町字データ（生エントリ）を読み込みキャッシュする。</summary>
     private async Task<IReadOnlyList<TownEntry>> LoadTownEntriesAsync(
         string prefName, string cityName, CancellationToken ct) {
@@ -284,6 +387,27 @@ internal sealed class AddressService(
         return entries;
     }
 
+    /// <summary>
+    /// remainder の先頭に一致する町字を探す。
+    /// NormalizeOaza=true の場合、「大字XXX」データへの「XXX」入力も一致とみなし
+    /// 正規形（大字付き）の Town を返す。戻り値の ConsumedLength は入力から消費した文字数。
+    /// </summary>
+    private static (Town? Town, int ConsumedLength) FindTown(
+        string remainder, IReadOnlyList<Town> towns, bool normalizeOaza) {
+
+        // 名前が長い順に検索（長い名前を優先して誤検知を防ぐ）
+        foreach (var t in towns.OrderByDescending(t => t.Name.Length)) {
+            if (remainder.StartsWith(t.Name)) {
+                return (t, t.Name.Length);
+            }
+            if (normalizeOaza && t.Name.Length > 2 && t.Name.StartsWith("大字")
+                && remainder.StartsWith(t.Name[2..])) {
+                return (t, t.Name.Length - 2);
+            }
+        }
+        return (null, 0);
+    }
+
     /// <summary>"1丁目2-3" または "3-2-1" を (Street, Block) に分割する。</summary>
     private static (string Street, string Block) SplitStreetBlock(
         string input, IReadOnlyList<TownEntry> chomeEntries) {
@@ -295,12 +419,16 @@ internal sealed class AddressService(
             return (match.Groups[1].Value, match.Groups[2].Value.TrimStart('-', '－'));
         }
 
-        // 省略記法: "3-2-1" → chome_n でデータを検索して漢字丁目名を返す
+        // 省略記法: "3-2-1" → 丁目がある地区では chome_n で漢字丁目名に変換、ない地区では番地として扱う
         var bareMatch = Regex.Match(input, @"^([0-9]+)([-－].+)$");
         if (bareMatch.Success && int.TryParse(bareMatch.Groups[1].Value, out var chomeN)) {
-            var chomeEntry = chomeEntries.FirstOrDefault(e => e.ChomeN == chomeN);
-            var street = chomeEntry?.Chome ?? (bareMatch.Groups[1].Value + "丁目");
-            return (street, bareMatch.Groups[2].Value.TrimStart('-', '－'));
+            if (chomeEntries.Any(e => e.ChomeN is not null)) {
+                var chomeEntry = chomeEntries.FirstOrDefault(e => e.ChomeN == chomeN);
+                var street = chomeEntry?.Chome ?? (bareMatch.Groups[1].Value + "丁目");
+                return (street, bareMatch.Groups[2].Value.TrimStart('-', '－'));
+            }
+            // 丁目なし地区: "2983-1" 全体を番地として返す
+            return (string.Empty, input);
         }
 
         return (string.Empty, string.Empty);
@@ -329,6 +457,7 @@ internal sealed class AddressService(
     }
     private sealed class JaCity {
         public int Code { get; init; }
+        public string? County { get; init; }
         public string City { get; init; } = string.Empty;
         public string? Ward { get; init; }
         public double[] Point { get; init; } = [];

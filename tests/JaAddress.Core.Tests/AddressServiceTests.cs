@@ -15,9 +15,10 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     public async Task GetPrefecturesAsync_正常系_都道府県一覧を返す() {
         var result = await this._sut.GetPrefecturesAsync();
 
-        Assert.Equal(2, result.Count);
+        Assert.Equal(3, result.Count);
         Assert.Contains(result, p => p.Name == "東京都");
         Assert.Contains(result, p => p.Name == "大阪府");
+        Assert.Contains(result, p => p.Name == "奈良県");
     }
 
     [Fact]
@@ -73,6 +74,24 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         var result = await this._sut.GetTownsAsync("東京都", "存在しない区");
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetTownsAsync_政令市名指定_全区の町字を集約して返す() {
+        var result = await this._sut.GetTownsAsync("大阪府", "大阪市");
+
+        Assert.NotEmpty(result);
+        Assert.Contains(result, t => t.Name == "梅田");
+        Assert.Contains(result, t => t.Name == "心斎橋筋");
+    }
+
+    [Fact]
+    public async Task GetTownsAsync_郡名指定_全町村の町字を集約して返す() {
+        var result = await this._sut.GetTownsAsync("奈良県", "吉野郡");
+
+        Assert.NotEmpty(result);
+        Assert.Contains(result, t => t.Name == "大字吉野山");
+        Assert.Contains(result, t => t.Name == "大字六田");
     }
 
     // -------------------------------------------------------
@@ -168,6 +187,20 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     }
 
     [Fact]
+    public async Task ParseAsync_市区町村完全省略_町字から市区町村を逆引きしてCorrectedがtrue() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都西新宿1-2-3", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("東京都", result.Prefecture.Name);
+        Assert.Equal("新宿区", result.City.Name);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("一丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+        Assert.True(result.Corrected);
+    }
+
+    [Fact]
     public async Task ParseAsync_通常マッチ_CorrectedがFalse() {
         var result = await this._sut.ParseAsync("東京都新宿区西新宿");
 
@@ -204,6 +237,83 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         var result = await this._sut.ParseAsync("勤務地：東京都新宿区西新宿");
 
         Assert.Null(result);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - 郡（county）を含む市区町村
+    // -------------------------------------------------------
+    // -------------------------------------------------------
+    // ParseAsync - 郡（county）を含む市区町村
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_郡あり市区町村_正しく特定される() {
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町大字吉野山123-4");
+
+        Assert.NotNull(result);
+        Assert.Equal("奈良県", result.Prefecture.Name);
+        Assert.Equal("吉野郡吉野町", result.City.Name);
+        Assert.Equal("吉野郡吉野町", result.City.DisplayName);
+        Assert.Equal("吉野郡", result.City.County);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_郡あり丁目なし地区_BlockにセットされRemainderが空() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町大字吉野山123-4", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字吉野山", result.Town?.Name);
+        Assert.Null(result.Street);
+        Assert.Equal("123-4", result.Block);
+        Assert.Equal(string.Empty, result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_郡省略_CorrectedがTrueで郡名が補完される() {
+        var result = await this._sut.ParseAsync("奈良県吉野町大字吉野山");
+
+        Assert.NotNull(result);
+        Assert.Equal("奈良県", result.Prefecture.Name);
+        Assert.Equal("吉野郡吉野町", result.City.Name);
+        Assert.True(result.Corrected);
+        Assert.Equal("大字吉野山", result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_郡省略_SplitRemainder_町字まで正しくパースされる() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("奈良県吉野町大字吉野山123-4", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("吉野郡吉野町", result.City.Name);
+        Assert.Equal("大字吉野山", result.Town?.Name);
+        Assert.Equal("123-4", result.Block);
+        Assert.True(result.Corrected);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - NormalizeOaza（大字正規化）
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_NormalizeOaza無効_大字なし入力は大字ありデータに一致しない() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = false };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町吉野山123-4", options);
+
+        // 「吉野山」は「大字吉野山」に一致しない → Town が null
+        Assert.NotNull(result);
+        Assert.Null(result.Town);
+        Assert.Equal("吉野山123-4", result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NormalizeOaza有効_大字なし入力が大字ありにマッチして正規化される() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町吉野山123-4", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字吉野山", result.Town?.Name);
+        Assert.Null(result.Street);
+        Assert.Equal("123-4", result.Block);
     }
 
     [Fact]

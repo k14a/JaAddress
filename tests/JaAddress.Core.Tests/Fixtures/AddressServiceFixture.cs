@@ -24,6 +24,7 @@ public sealed class AddressServiceFixture : IDisposable {
     private static void SetupTestData(string dataDir) {
         Directory.CreateDirectory(Path.Combine(dataDir, "ja", "東京都"));
         Directory.CreateDirectory(Path.Combine(dataDir, "ja", "大阪府"));
+        Directory.CreateDirectory(Path.Combine(dataDir, "ja", "奈良県"));
 
         // ja.json
         File.WriteAllText(Path.Combine(dataDir, "ja.json"), """
@@ -47,6 +48,14 @@ public sealed class AddressServiceFixture : IDisposable {
                   "cities": [
                     { "code": 27100, "city": "大阪市", "ward": "北区",  "point": [135.5100, 34.7024] },
                     { "code": 27101, "city": "大阪市", "ward": "中央区", "point": [135.5200, 34.6863] }
+                  ]
+                },
+                {
+                  "code": 29000,
+                  "pref": "奈良県",
+                  "point": [135.8048, 34.6851],
+                  "cities": [
+                    { "code": 29341, "county": "吉野郡", "city": "吉野町", "point": [135.8590, 34.4469] }
                   ]
                 }
               ]
@@ -78,12 +87,33 @@ public sealed class AddressServiceFixture : IDisposable {
             }
             """);
 
-        // 大阪府/大阪市.json
-        File.WriteAllText(Path.Combine(dataDir, "ja", "大阪府", "大阪市.json"), """
+        // 大阪府/大阪市北区.json
+        File.WriteAllText(Path.Combine(dataDir, "ja", "大阪府", "大阪市北区.json"), """
             {
               "meta": { "updated": 20240101 },
               "data": [
                 { "oaza_cho": "梅田", "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.4964, 34.7024] }
+              ]
+            }
+            """);
+
+        // 大阪府/大阪市中央区.json
+        File.WriteAllText(Path.Combine(dataDir, "ja", "大阪府", "大阪市中央区.json"), """
+            {
+              "meta": { "updated": 20240101 },
+              "data": [
+                { "oaza_cho": "心斎橋筋", "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.5016, 34.6730] }
+              ]
+            }
+            """);
+
+        // 奈良県/吉野郡吉野町.json — 丁目なし地区
+        File.WriteAllText(Path.Combine(dataDir, "ja", "奈良県", "吉野郡吉野町.json"), """
+            {
+              "meta": { "updated": 20240101 },
+              "data": [
+                { "oaza_cho": "大字吉野山", "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8590, 34.3653] },
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8620, 34.4010] }
               ]
             }
             """);

@@ -10,15 +10,21 @@ internal static class ParseEndpoints {
     public static void Map(WebApplication app) {
         var group = app.MapGroup("/parse").WithTags("住所パース");
 
-        // GET /parse?q=...
+        // GET /parse?q=...&bestEffort=false&normalizeOaza=false
         group.MapGet("/", async (
             string q,
+            bool bestEffort,
+            bool normalizeOaza,
             IAddressService svc,
             CancellationToken ct) => {
 
-            var options = new AddressParseOptions { SplitRemainder = true };
-            var result  = await svc.ParseAsync(q, options, ct);
-            var dto     = ParseDtoMapper.ToDto(q, result);
+            var options = new AddressParseOptions {
+                SplitRemainder = true,
+                BestEffort     = bestEffort,
+                NormalizeOaza  = normalizeOaza,
+            };
+            var result = await svc.ParseAsync(q, options, ct);
+            var dto    = ParseDtoMapper.ToDto(q, result);
             return dto.Success ? Results.Ok(dto) : Results.NotFound(dto);
         })
         .WithSummary("住所を1件パースする");
@@ -34,7 +40,11 @@ internal static class ParseEndpoints {
             if (request.Addresses.Count > max)
                 return Results.BadRequest($"一度に処理できるのは {max} 件までです。");
 
-            var parseOptions = new AddressParseOptions { SplitRemainder = true };
+            var parseOptions = new AddressParseOptions {
+                SplitRemainder = true,
+                BestEffort     = request.BestEffort,
+                NormalizeOaza  = request.NormalizeOaza,
+            };
             var results = new List<ParseResultDto>(request.Addresses.Count);
             foreach (var address in request.Addresses) {
                 var result = await svc.ParseAsync(address, parseOptions, ct);
@@ -58,9 +68,11 @@ internal static class ParseEndpoints {
         })
         .WithSummary("TSVテンプレートをダウンロードする");
 
-        // POST /parse/tsv
+        // POST /parse/tsv?bestEffort=false&normalizeOaza=false
         group.MapPost("/tsv", async (
             IFormFile file,
+            bool bestEffort,
+            bool normalizeOaza,
             IAddressService svc,
             IOptions<ApiOptions> apiOptions,
             CancellationToken ct) => {
@@ -71,7 +83,11 @@ internal static class ParseEndpoints {
             if (error is not null)
                 return Results.BadRequest(error);
 
-            var parseOptions = new AddressParseOptions { SplitRemainder = true };
+            var parseOptions = new AddressParseOptions {
+                SplitRemainder = true,
+                BestEffort     = bestEffort,
+                NormalizeOaza  = normalizeOaza,
+            };
             var results = new List<ParseResultDto>(addresses.Count);
             foreach (var address in addresses) {
                 var result = await svc.ParseAsync(address, parseOptions, ct);

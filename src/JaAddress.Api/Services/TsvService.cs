@@ -5,7 +5,7 @@ namespace JaAddress.Api.Services;
 
 internal sealed class TsvService {
     private static readonly string[] Headers =
-        ["address", "prefecture", "city", "town", "street", "block", "remainder"];
+        ["address", "prefecture", "city", "county", "town", "street", "block", "remainder", "corrected", "offset"];
 
     public static string BuildTemplate() =>
         string.Join('\t', Headers) + "\n";
@@ -18,19 +18,25 @@ internal sealed class TsvService {
 
         // 1行目はヘッダ
         var header = reader.ReadLine();
-        if (header is null) return ([], "ファイルが空です。");
+        if (header is null) {
+            return ([], "ファイルが空です。");
+        }
 
         while (!reader.EndOfStream) {
-            if (addresses.Count >= maxRows)
+            if (addresses.Count >= maxRows) {
                 return ([], $"TSVの行数が上限（{maxRows}件）を超えています。");
+            }
 
             var line = reader.ReadLine();
-            if (string.IsNullOrWhiteSpace(line)) continue;
+            if (string.IsNullOrWhiteSpace(line)) {
+                continue;
+            }
 
             var columns = line.Split('\t');
             var address = columns[0].Trim();
-            if (!string.IsNullOrEmpty(address))
+            if (!string.IsNullOrEmpty(address)) {
                 addresses.Add(address);
+            }
         }
 
         return (addresses, null);
@@ -44,10 +50,13 @@ internal sealed class TsvService {
                 r.Input,
                 r.Prefecture ?? string.Empty,
                 r.City       ?? string.Empty,
+                r.County     ?? string.Empty,
                 r.Town       ?? string.Empty,
                 r.Street     ?? string.Empty,
                 r.Block      ?? string.Empty,
                 r.Remainder  ?? string.Empty,
+                r.Corrected ? "true" : string.Empty,
+                r.Offset > 0 ? r.Offset.ToString() : string.Empty,
             ]));
         }
         return sb.ToString();
