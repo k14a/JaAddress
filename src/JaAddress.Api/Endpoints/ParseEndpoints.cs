@@ -16,7 +16,7 @@ internal static class ParseEndpoints {
             IAddressService svc,
             CancellationToken ct,
             bool bestEffort = false,
-            bool normalizeOaza = false) => {
+            bool normalizeOaza = true) => {
 
             var options = new AddressParseOptions {
                 SplitRemainder = true,
@@ -75,7 +75,7 @@ internal static class ParseEndpoints {
             IOptions<ApiOptions> apiOptions,
             CancellationToken ct,
             bool bestEffort = false,
-            bool normalizeOaza = false) => {
+            bool normalizeOaza = true) => {
 
             var max = apiOptions.Value.MaxTsvRows;
             await using var stream = file.OpenReadStream();

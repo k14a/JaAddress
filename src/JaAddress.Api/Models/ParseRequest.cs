@@ -7,5 +7,5 @@ public sealed class ParseRequest {
     /// true の場合、「大字」が省略された入力でも「大字XXX」データと照合し、
     /// 正規形（大字付き）の町字名を返す。
     /// </summary>
-    public bool NormalizeOaza { get; init; } = false;
+    public bool NormalizeOaza { get; init; } = true;
 }

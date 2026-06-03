@@ -295,6 +295,42 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     // ParseAsync - NormalizeOaza（大字正規化）
     // -------------------------------------------------------
     [Fact]
+    public async Task ParseAsync_SplitRemainder_番地の後に建物名_BlockとRemainderに分離される() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿1-2-3新宿NSビル", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("一丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+        Assert.Equal("新宿NSビル", result.Remainder);
+    }
+
+    [Theory]
+    [InlineData("東京都新宿区西新宿1-2-3 新宿NSビル")]   // 半角スペース
+    [InlineData("東京都新宿区西新宿1-2-3　新宿NSビル")]  // 全角スペース
+    public async Task ParseAsync_SplitRemainder_番地と建物名の間のスペースはTrimされる(string address) {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("2-3", result.Block);
+        Assert.Equal("新宿NSビル", result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_丁目なし地区でハイフンなし番地_Blockにセットされる() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町大字吉野山567", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字吉野山", result.Town?.Name);
+        Assert.Null(result.Street);
+        Assert.Equal("567", result.Block);
+        Assert.Equal(string.Empty, result.Remainder);
+    }
+
+    [Fact]
     public async Task ParseAsync_NormalizeOaza無効_大字なし入力は大字ありデータに一致しない() {
         var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = false };
         var result = await this._sut.ParseAsync("奈良県吉野郡吉野町吉野山123-4", options);

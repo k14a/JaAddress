@@ -232,7 +232,7 @@ internal sealed class AddressService(
         // 丁目名をデータから引くために生エントリを使う（GetTownsAsync 内でキャッシュ済み）
         var rawEntries = await this.LoadTownEntriesAsync(prefecture.Name, city.Name, ct);
         var chomeEntries = rawEntries.Where(e => e.OazaCho == town.Name).ToList();
-        var (street, block) = SplitStreetBlock(afterTown, chomeEntries);
+        var (street, block, tail) = SplitStreetBlock(afterTown, chomeEntries);
 
         return new AddressParseResult {
             Prefecture = prefecture,
@@ -242,7 +242,7 @@ internal sealed class AddressService(
             Town = town,
             Street = string.IsNullOrEmpty(street) ? null : street,
             Block = string.IsNullOrEmpty(block) ? null : block,
-            Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterTown : string.Empty,
+            Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterTown : tail,
         };
     }
 
@@ -408,30 +408,45 @@ internal sealed class AddressService(
         return (null, 0);
     }
 
-    /// <summary>"1丁目2-3" または "3-2-1" を (Street, Block) に分割する。</summary>
-    private static (string Street, string Block) SplitStreetBlock(
+    /// <summary>
+    /// "1丁目2-3建物名" や "3-2-1建物名" を (Street, Block, Tail) に分割する。
+    /// Tail には番地以降の建物名・フロア等が入る。
+    /// </summary>
+    private static (string Street, string Block, string Tail) SplitStreetBlock(
         string input, IReadOnlyList<TownEntry> chomeEntries) {
 
-        // 明示的な丁目/番地/番: "1丁目2-3" → ("1丁目", "2-3")
+        string street = string.Empty;
+        string afterStreet = input;
+
+        // 明示的な丁目/番地/番: "1丁目..." → street="1丁目"
         // [0-9] で半角数字のみにマッチさせる（\d は全角数字にもマッチするため使わない）
-        var match = Regex.Match(input, @"^([0-9]+(?:丁目|番地|番))(.*)$");
-        if (match.Success) {
-            return (match.Groups[1].Value, match.Groups[2].Value.TrimStart('-', '－'));
-        }
-
-        // 省略記法: "3-2-1" → 丁目がある地区では chome_n で漢字丁目名に変換、ない地区では番地として扱う
-        var bareMatch = Regex.Match(input, @"^([0-9]+)([-－].+)$");
-        if (bareMatch.Success && int.TryParse(bareMatch.Groups[1].Value, out var chomeN)) {
-            if (chomeEntries.Any(e => e.ChomeN is not null)) {
+        var explicitMatch = Regex.Match(input, @"^([0-9]+(?:丁目|番地|番))(.*)$");
+        if (explicitMatch.Success) {
+            street = explicitMatch.Groups[1].Value;
+            afterStreet = explicitMatch.Groups[2].Value.TrimStart('-', '－');
+        } else if (chomeEntries.Any(e => e.ChomeN is not null)) {
+            // 丁目省略形（丁目あり地区のみ）: "3-..." → chome_n から漢字丁目名に変換
+            var bareChomeMatch = Regex.Match(input, @"^([0-9]+)[-－](.*)$");
+            if (bareChomeMatch.Success && int.TryParse(bareChomeMatch.Groups[1].Value, out var chomeN)) {
                 var chomeEntry = chomeEntries.FirstOrDefault(e => e.ChomeN == chomeN);
-                var street = chomeEntry?.Chome ?? (bareMatch.Groups[1].Value + "丁目");
-                return (street, bareMatch.Groups[2].Value.TrimStart('-', '－'));
+                street = chomeEntry?.Chome ?? (bareChomeMatch.Groups[1].Value + "丁目");
+                afterStreet = bareChomeMatch.Groups[2].Value;
             }
-            // 丁目なし地区: "2983-1" 全体を番地として返す
-            return (string.Empty, input);
         }
 
-        return (string.Empty, string.Empty);
+        if (afterStreet.Length == 0) {
+            return (street, string.Empty, string.Empty);
+        }
+
+        // 番地と建物名を分離: "[0-9]+(-[0-9]+)*" を番地、残りを建物名等として返す
+        var blockMatch = Regex.Match(afterStreet, @"^([0-9]+(?:[-－][0-9]+)*)(.*)$");
+        if (blockMatch.Success) {
+            var tail = blockMatch.Groups[2].Value.TrimStart('-', '－').Trim(' ', '　');
+            return (street, blockMatch.Groups[1].Value, tail);
+        }
+
+        // 番地なし（建物名・フロア等が続く場合）
+        return (street, string.Empty, afterStreet);
     }
 
     private static async Task<T?> LoadJsonAsync<T>(string path, CancellationToken ct) {

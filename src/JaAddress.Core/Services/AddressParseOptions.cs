@@ -17,5 +17,5 @@ public sealed class AddressParseOptions {
     /// 一致した場合は正規形（大字付き）の名前を返す。
     /// 例: 入力 "久保" → データ "大字久保" に一致し、Town.Name = "大字久保" を返す。
     /// </summary>
-    public bool NormalizeOaza { get; init; } = false;
+    public bool NormalizeOaza { get; init; } = true;
 }

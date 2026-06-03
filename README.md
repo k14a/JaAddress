@@ -89,7 +89,7 @@ public class MyService(IAddressService addressService) {
 | `SplitRemainder` | `bool` | `false` | `true` にすると町字・丁目・番地まで分解する |
 | `NormalizeNumber` | `bool` | `true` | 全角数字・ハイフン類を半角に変換してから解析する |
 | `BestEffort` | `bool` | `false` | 入力の先頭以外に都道府県名が見つかった場合も解析を試みる。`Offset` で開始位置を返す |
-| `NormalizeOaza` | `bool` | `false` | 「大字」省略入力（例: `久保`）をデータ上の正規形（例: `大字久保`）に照合する |
+| `NormalizeOaza` | `bool` | `true` | 「大字」省略入力（例: `久保`）をデータ上の正規形（例: `大字久保`）に照合する |
 
 ### `AddressParseResult`
 
