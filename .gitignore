@@ -68,5 +68,4 @@ data/
 
 # コンテナ / Devcontainers（必要に応じて）
 .devcontainer/
-Dockerfile
 docker-compose.*

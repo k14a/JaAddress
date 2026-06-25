@@ -21,6 +21,21 @@
 
 `JaAddress.DataBuilder` で住所データを取得します。
 
+#### Docker を使う場合（.NET SDK 不要）
+
+```bash
+# イメージをビルド（初回のみ）
+docker build -t jaaddress-databuilder .
+
+# 全都道府県を取得してカレントディレクトリの data/ に保存
+docker run --rm -v "$(pwd)/data:/data" jaaddress-databuilder
+
+# 特定の都道府県のみ
+docker run --rm -v "$(pwd)/data:/data" jaaddress-databuilder --pref 東京都
+```
+
+#### .NET SDK を使う場合
+
 ```bash
 # 全都道府県（初回は時間がかかります）
 dotnet run --project src/JaAddress.DataBuilder -- --output ./data
