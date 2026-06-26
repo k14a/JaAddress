@@ -10,18 +10,20 @@ internal static class ParseEndpoints {
     public static void Map(WebApplication app) {
         var group = app.MapGroup("/parse").WithTags("住所パース");
 
-        // GET /parse?q=...&bestEffort=false&normalizeOaza=false
+        // GET /parse?q=...&bestEffort=false&normalizeNumber=true&normalizeOaza=false
         group.MapGet("/", async (
             string q,
             IAddressService svc,
             CancellationToken ct,
             bool bestEffort = false,
+            bool normalizeNumber = true,
             bool normalizeOaza = true) => {
 
             var options = new AddressParseOptions {
-                SplitRemainder = true,
-                BestEffort     = bestEffort,
-                NormalizeOaza  = normalizeOaza,
+                SplitRemainder  = true,
+                BestEffort      = bestEffort,
+                NormalizeNumber = normalizeNumber,
+                NormalizeOaza   = normalizeOaza,
             };
             var result = await svc.ParseAsync(q, options, ct);
             var dto    = ParseDtoMapper.ToDto(q, result);
@@ -41,9 +43,10 @@ internal static class ParseEndpoints {
                 return Results.BadRequest($"一度に処理できるのは {max} 件までです。");
 
             var parseOptions = new AddressParseOptions {
-                SplitRemainder = true,
-                BestEffort     = request.BestEffort,
-                NormalizeOaza  = request.NormalizeOaza,
+                SplitRemainder  = true,
+                BestEffort      = request.BestEffort,
+                NormalizeNumber = request.NormalizeNumber,
+                NormalizeOaza   = request.NormalizeOaza,
             };
             var results = new List<ParseResultDto>(request.Addresses.Count);
             foreach (var address in request.Addresses) {
@@ -68,13 +71,14 @@ internal static class ParseEndpoints {
         })
         .WithSummary("TSVテンプレートをダウンロードする");
 
-        // POST /parse/tsv?bestEffort=false&normalizeOaza=false
+        // POST /parse/tsv?bestEffort=false&normalizeNumber=true&normalizeOaza=false
         group.MapPost("/tsv", async (
             IFormFile file,
             IAddressService svc,
             IOptions<ApiOptions> apiOptions,
             CancellationToken ct,
             bool bestEffort = false,
+            bool normalizeNumber = true,
             bool normalizeOaza = true) => {
 
             var max = apiOptions.Value.MaxTsvRows;
@@ -84,9 +88,10 @@ internal static class ParseEndpoints {
                 return Results.BadRequest(error);
 
             var parseOptions = new AddressParseOptions {
-                SplitRemainder = true,
-                BestEffort     = bestEffort,
-                NormalizeOaza  = normalizeOaza,
+                SplitRemainder  = true,
+                BestEffort      = bestEffort,
+                NormalizeNumber = normalizeNumber,
+                NormalizeOaza   = normalizeOaza,
             };
             var results = new List<ParseResultDto>(addresses.Count);
             foreach (var address in addresses) {

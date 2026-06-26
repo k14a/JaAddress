@@ -162,13 +162,24 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     }
 
     [Fact]
-    public async Task ParseAsync_SplitRemainder_丁目省略形_chomeデータから漢字で返す() {
+    public async Task ParseAsync_SplitRemainder_丁目省略形_半角数字丁目で返す() {
         var options = new AddressParseOptions { SplitRemainder = true };
         var result = await this._sut.ParseAsync("東京都新宿区西新宿1-2-3", options);
 
         Assert.NotNull(result);
         Assert.Equal("西新宿", result.Town?.Name);
-        Assert.Equal("一丁目", result.Street);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_漢字丁目形_半角数字丁目に正規化される() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区西新宿一丁目2-3", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
         Assert.Equal("2-3", result.Block);
     }
 
@@ -195,7 +206,7 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Equal("東京都", result.Prefecture.Name);
         Assert.Equal("新宿区", result.City.Name);
         Assert.Equal("西新宿", result.Town?.Name);
-        Assert.Equal("一丁目", result.Street);
+        Assert.Equal("1丁目", result.Street);
         Assert.Equal("2-3", result.Block);
         Assert.True(result.Corrected);
     }
@@ -301,7 +312,7 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
 
         Assert.NotNull(result);
         Assert.Equal("西新宿", result.Town?.Name);
-        Assert.Equal("一丁目", result.Street);
+        Assert.Equal("1丁目", result.Street);
         Assert.Equal("2-3", result.Block);
         Assert.Equal("新宿NSビル", result.Remainder);
     }

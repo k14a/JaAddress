@@ -425,12 +425,24 @@ internal sealed class AddressService(
             street = explicitMatch.Groups[1].Value;
             afterStreet = explicitMatch.Groups[2].Value.TrimStart('-', '－');
         } else if (chomeEntries.Any(e => e.ChomeN is not null)) {
-            // 丁目省略形（丁目あり地区のみ）: "3-..." → chome_n から漢字丁目名に変換
+            // 丁目省略形（丁目あり地区のみ）: "3-..." → 入力の半角数字 + "丁目" に変換
+            // chomeEntry.Chome（漢字形）ではなく入力数字を使うことで出力形式を統一する
             var bareChomeMatch = Regex.Match(input, @"^([0-9]+)[-－](.*)$");
             if (bareChomeMatch.Success && int.TryParse(bareChomeMatch.Groups[1].Value, out var chomeN)) {
-                var chomeEntry = chomeEntries.FirstOrDefault(e => e.ChomeN == chomeN);
-                street = chomeEntry?.Chome ?? (bareChomeMatch.Groups[1].Value + "丁目");
+                if (chomeEntries.Any(e => e.ChomeN == chomeN)) {
+                    street = bareChomeMatch.Groups[1].Value + "丁目";
+                }
                 afterStreet = bareChomeMatch.Groups[2].Value;
+            } else {
+                // 漢字丁目形（"一丁目..."）: chomeEntries.Chome と前方一致して "N丁目" に変換
+                var kanjiEntry = chomeEntries
+                    .Where(e => e.Chome is not null)
+                    .OrderByDescending(e => e.Chome!.Length)
+                    .FirstOrDefault(e => input.StartsWith(e.Chome!));
+                if (kanjiEntry is not null) {
+                    street = kanjiEntry.ChomeN.HasValue ? kanjiEntry.ChomeN.Value + "丁目" : kanjiEntry.Chome!;
+                    afterStreet = input[kanjiEntry.Chome!.Length..].TrimStart('-', '－');
+                }
             }
         }
 
