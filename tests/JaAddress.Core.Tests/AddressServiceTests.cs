@@ -150,10 +150,12 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     // -------------------------------------------------------
     // ParseAsync - NormalizeNumber
     // -------------------------------------------------------
-    [Fact]
-    public async Task ParseAsync_全角数字_正規化して分割する() {
+    [Theory]
+    [InlineData("東京都新宿区西新宿１丁目２－３")]  // 全角数字 + 全角ハイフン U+FF0D
+    [InlineData("東京都新宿区西新宿１丁目２−３")]   // 全角数字 + マイナス記号 U+2212
+    public async Task ParseAsync_全角数字_正規化して分割する(string address) {
         var options = new AddressParseOptions { SplitRemainder = true, NormalizeNumber = true };
-        var result = await this._sut.ParseAsync("東京都新宿区西新宿１丁目２－３", options);
+        var result = await this._sut.ParseAsync(address, options);
 
         Assert.NotNull(result);
         Assert.Equal("西新宿", result.Town?.Name);
