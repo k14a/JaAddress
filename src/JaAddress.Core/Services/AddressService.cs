@@ -299,7 +299,7 @@ internal sealed class AddressService(
             for (var i = 0; i < src.Length; i++) {
                 span[i] = src[i] switch {
                     >= '０' and <= '９' => (char)(src[i] - '０' + '0'),
-                    '－' or '―' or '‐' or '–' or '−' => '-',
+                    '－' or '―' or '‐' or '–' or '−' or 'ー' => '-',
                     _ => src[i],
                 };
             }
@@ -424,11 +424,11 @@ internal sealed class AddressService(
         var explicitMatch = Regex.Match(input, @"^([0-9]+丁目)(.*)$");
         if (explicitMatch.Success) {
             street = explicitMatch.Groups[1].Value;
-            afterStreet = explicitMatch.Groups[2].Value.TrimStart('-', '－', '−');
+            afterStreet = explicitMatch.Groups[2].Value.TrimStart('-', '－', '−', 'ー');
         } else if (chomeEntries.Any(e => e.ChomeN is not null)) {
             // 丁目省略形（丁目あり地区のみ）: "3-..." → 入力の半角数字 + "丁目" に変換
             // chomeEntry.Chome（漢字形）ではなく入力数字を使うことで出力形式を統一する
-            var bareChomeMatch = Regex.Match(input, @"^([0-9]+)[-－−](.*)$");
+            var bareChomeMatch = Regex.Match(input, @"^([0-9]+)[-－−ー](.*)$");
             if (bareChomeMatch.Success && int.TryParse(bareChomeMatch.Groups[1].Value, out var chomeN)) {
                 if (chomeEntries.Any(e => e.ChomeN == chomeN)) {
                     street = bareChomeMatch.Groups[1].Value + "丁目";
@@ -442,7 +442,7 @@ internal sealed class AddressService(
                     .FirstOrDefault(e => input.StartsWith(e.Chome!));
                 if (kanjiEntry is not null) {
                     street = kanjiEntry.ChomeN.HasValue ? kanjiEntry.ChomeN.Value + "丁目" : kanjiEntry.Chome!;
-                    afterStreet = input[kanjiEntry.Chome!.Length..].TrimStart('-', '－', '−');
+                    afterStreet = input[kanjiEntry.Chome!.Length..].TrimStart('-', '－', '−', 'ー');
                 }
             }
         }
@@ -456,9 +456,9 @@ internal sealed class AddressService(
         // "N番(地?)" 単独（後続数字なし）→ "N" に正規化して 番/番地 を除去
         blockInput = Regex.Replace(blockInput, @"^([0-9]+)番地?", "$1");
         // 番地と建物名を分離: "[0-9]+(-[0-9]+)*" を番地、残りを建物名等として返す
-        var blockMatch = Regex.Match(blockInput, @"^([0-9]+(?:[-－−][0-9]+)*)(.*)$");
+        var blockMatch = Regex.Match(blockInput, @"^([0-9]+(?:[-－−ー][0-9]+)*)(.*)$");
         if (blockMatch.Success) {
-            var tail = blockMatch.Groups[2].Value.TrimStart('-', '－', '−').Trim(' ', '　');
+            var tail = blockMatch.Groups[2].Value.TrimStart('-', '－', '−', 'ー').Trim(' ', '　');
             return (street, blockMatch.Groups[1].Value, tail);
         }
 
