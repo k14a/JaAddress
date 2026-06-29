@@ -418,9 +418,10 @@ internal sealed class AddressService(
         string street = string.Empty;
         string afterStreet = input;
 
-        // 明示的な丁目/番地/番: "1丁目..." → street="1丁目"
+        // 明示的な丁目: "1丁目..." → street="1丁目"
+        // 番地/番は street ではなく block に属するため対象外
         // [0-9] で半角数字のみにマッチさせる（\d は全角数字にもマッチするため使わない）
-        var explicitMatch = Regex.Match(input, @"^([0-9]+(?:丁目|番地|番))(.*)$");
+        var explicitMatch = Regex.Match(input, @"^([0-9]+丁目)(.*)$");
         if (explicitMatch.Success) {
             street = explicitMatch.Groups[1].Value;
             afterStreet = explicitMatch.Groups[2].Value.TrimStart('-', '－');
@@ -450,8 +451,10 @@ internal sealed class AddressService(
             return (street, string.Empty, string.Empty);
         }
 
-        // "N番(地?)M号?" → "N-M" に正規化（例: "1番20号" → "1-20"）
+        // "N番(地?)M号?" → "N-M" に正規化（例: "1番20号" → "1-20"、"7番地5" → "7-5"）
         var blockInput = Regex.Replace(afterStreet, @"^([0-9]+)番地?([0-9]+)号?", "$1-$2");
+        // "N番(地?)" 単独（後続数字なし）→ "N" に正規化して 番/番地 を除去
+        blockInput = Regex.Replace(blockInput, @"^([0-9]+)番地?", "$1");
         // 番地と建物名を分離: "[0-9]+(-[0-9]+)*" を番地、残りを建物名等として返す
         var blockMatch = Regex.Match(blockInput, @"^([0-9]+(?:[-－][0-9]+)*)(.*)$");
         if (blockMatch.Success) {

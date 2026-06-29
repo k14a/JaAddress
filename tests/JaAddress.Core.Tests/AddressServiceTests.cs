@@ -345,6 +345,22 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Equal("新宿NSビル", result.Remainder);
     }
 
+    [Theory]
+    [InlineData("東京都千代田区二番町7番地5平和ビル5階",  "7-5", "平和ビル5階")]  // N番地M
+    [InlineData("東京都千代田区二番町7番5号平和ビル5階",  "7-5", "平和ビル5階")]  // N番M号
+    [InlineData("東京都千代田区二番町7番地平和ビル5階",   "7",   "平和ビル5階")]  // N番地（号なし）
+    public async Task ParseAsync_SplitRemainder_丁目なし地区で番地形式の番地_streetがnullでblockが正規化される(
+        string address, string expectedBlock, string expectedRemainder) {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("二番町", result.Town?.Name);
+        Assert.Null(result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+        Assert.Equal(expectedRemainder, result.Remainder);
+    }
+
     [Fact]
     public async Task ParseAsync_SplitRemainder_丁目なし地区でハイフンなし番地_Blockにセットされる() {
         var options = new AddressParseOptions { SplitRemainder = true };

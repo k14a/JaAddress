@@ -81,8 +81,9 @@ public sealed class AddressServiceFixture : IDisposable {
             {
               "meta": { "updated": 20240101 },
               "data": [
-                { "oaza_cho": "丸の内", "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [139.7671, 35.6812] },
-                { "oaza_cho": "大手町", "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [139.7634, 35.6863] }
+                { "oaza_cho": "丸の内", "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true,  "point": [139.7671, 35.6812] },
+                { "oaza_cho": "大手町", "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true,  "point": [139.7634, 35.6863] },
+                { "oaza_cho": "二番町", "chome": null,     "chome_n": null, "koaza": null, "rsdt": false, "point": [139.7361, 35.6862] }
               ]
             }
             """);
