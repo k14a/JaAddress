@@ -450,8 +450,10 @@ internal sealed class AddressService(
             return (street, string.Empty, string.Empty);
         }
 
+        // "N番(地?)M号?" → "N-M" に正規化（例: "1番20号" → "1-20"）
+        var blockInput = Regex.Replace(afterStreet, @"^([0-9]+)番地?([0-9]+)号?", "$1-$2");
         // 番地と建物名を分離: "[0-9]+(-[0-9]+)*" を番地、残りを建物名等として返す
-        var blockMatch = Regex.Match(afterStreet, @"^([0-9]+(?:[-－][0-9]+)*)(.*)$");
+        var blockMatch = Regex.Match(blockInput, @"^([0-9]+(?:[-－][0-9]+)*)(.*)$");
         if (blockMatch.Success) {
             var tail = blockMatch.Groups[2].Value.TrimStart('-', '－').Trim(' ', '　');
             return (street, blockMatch.Groups[1].Value, tail);

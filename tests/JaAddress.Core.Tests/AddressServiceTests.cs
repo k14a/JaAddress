@@ -318,6 +318,22 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     }
 
     [Theory]
+    [InlineData("東京都新宿区新宿3丁目1番20号新宿ビル3F",  "1-20", "新宿ビル3F")]  // 番M号
+    [InlineData("東京都新宿区新宿3丁目1番地20号新宿ビル3F","1-20", "新宿ビル3F")]  // 番地M号
+    [InlineData("東京都新宿区新宿3丁目1番20新宿ビル3F",   "1-20", "新宿ビル3F")]   // 号なし
+    public async Task ParseAsync_SplitRemainder_番号形式の番地_ハイフン区切りに正規化される(
+        string address, string expectedBlock, string expectedRemainder) {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("新宿", result.Town?.Name);
+        Assert.Equal("3丁目", result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+        Assert.Equal(expectedRemainder, result.Remainder);
+    }
+
+    [Theory]
     [InlineData("東京都新宿区西新宿1-2-3 新宿NSビル")]   // 半角スペース
     [InlineData("東京都新宿区西新宿1-2-3　新宿NSビル")]  // 全角スペース
     public async Task ParseAsync_SplitRemainder_番地と建物名の間のスペースはTrimされる(string address) {
