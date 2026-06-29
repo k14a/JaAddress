@@ -10,25 +10,26 @@ internal static class ParseEndpoints {
     public static void Map(WebApplication app) {
         var group = app.MapGroup("/parse").WithTags("住所パース");
 
-        // GET /parse?q=...&bestEffort=false&normalizeNumber=true&normalizeOaza=false
+        // GET /parse?q=...&bestEffort=false&splitRemainder=true&normalizeNumber=true&normalizeOaza=false
         group.MapGet("/", async (
             string q,
             IAddressService svc,
             CancellationToken ct,
             bool bestEffort = false,
+            bool splitRemainder = true,
             bool normalizeNumber = true,
             bool normalizeOaza = true) => {
 
-            var options = new AddressParseOptions {
-                SplitRemainder  = true,
-                BestEffort      = bestEffort,
-                NormalizeNumber = normalizeNumber,
-                NormalizeOaza   = normalizeOaza,
-            };
-            var result = await svc.ParseAsync(q, options, ct);
-            var dto    = ParseDtoMapper.ToDto(q, result);
-            return dto.Success ? Results.Ok(dto) : Results.NotFound(dto);
-        })
+                var options = new AddressParseOptions {
+                    SplitRemainder  = splitRemainder,
+                    BestEffort      = bestEffort,
+                    NormalizeNumber = normalizeNumber,
+                    NormalizeOaza   = normalizeOaza,
+                };
+                var result = await svc.ParseAsync(q, options, ct);
+                var dto = ParseDtoMapper.ToDto(q, result);
+                return dto.Success ? Results.Ok(dto) : Results.NotFound(dto);
+            })
         .WithSummary("住所を1件パースする");
 
         // POST /parse (JSON)
@@ -38,27 +39,28 @@ internal static class ParseEndpoints {
             IOptions<ApiOptions> apiOptions,
             CancellationToken ct) => {
 
-            var max = apiOptions.Value.MaxJsonBatchSize;
-            if (request.Addresses.Count > max)
-                return Results.BadRequest($"一度に処理できるのは {max} 件までです。");
+                var max = apiOptions.Value.MaxJsonBatchSize;
+                if (request.Addresses.Count > max) {
+                    return Results.BadRequest($"一度に処理できるのは {max} 件までです。");
+                }
 
-            var parseOptions = new AddressParseOptions {
-                SplitRemainder  = true,
-                BestEffort      = request.BestEffort,
-                NormalizeNumber = request.NormalizeNumber,
-                NormalizeOaza   = request.NormalizeOaza,
-            };
-            var results = new List<ParseResultDto>(request.Addresses.Count);
-            foreach (var address in request.Addresses) {
-                var result = await svc.ParseAsync(address, parseOptions, ct);
-                results.Add(ParseDtoMapper.ToDto(address, result));
-            }
+                var parseOptions = new AddressParseOptions {
+                    SplitRemainder  = request.SplitRemainder,
+                    BestEffort      = request.BestEffort,
+                    NormalizeNumber = request.NormalizeNumber,
+                    NormalizeOaza   = request.NormalizeOaza,
+                };
+                var results = new List<ParseResultDto>(request.Addresses.Count);
+                foreach (var address in request.Addresses) {
+                    var result = await svc.ParseAsync(address, parseOptions, ct);
+                    results.Add(ParseDtoMapper.ToDto(address, result));
+                }
 
-            return Results.Ok(new ParseResponse {
-                Results = results,
-                Count   = results.Count,
-            });
-        })
+                return Results.Ok(new ParseResponse {
+                    Results = results,
+                    Count = results.Count,
+                });
+            })
         .WithSummary("住所を複数件パースする（JSON、最大20件）");
 
         // GET /parse/tsv/template
@@ -71,40 +73,42 @@ internal static class ParseEndpoints {
         })
         .WithSummary("TSVテンプレートをダウンロードする");
 
-        // POST /parse/tsv?bestEffort=false&normalizeNumber=true&normalizeOaza=false
+        // POST /parse/tsv?bestEffort=false&splitRemainder=true&normalizeNumber=true&normalizeOaza=false
         group.MapPost("/tsv", async (
             IFormFile file,
             IAddressService svc,
             IOptions<ApiOptions> apiOptions,
             CancellationToken ct,
             bool bestEffort = false,
+            bool splitRemainder = true,
             bool normalizeNumber = true,
             bool normalizeOaza = true) => {
 
-            var max = apiOptions.Value.MaxTsvRows;
-            await using var stream = file.OpenReadStream();
-            var (addresses, error) = TsvService.ParseUpload(stream, max);
-            if (error is not null)
-                return Results.BadRequest(error);
+                var max = apiOptions.Value.MaxTsvRows;
+                await using var stream = file.OpenReadStream();
+                var (addresses, error) = TsvService.ParseUpload(stream, max);
+                if (error is not null) {
+                    return Results.BadRequest(error);
+                }
 
-            var parseOptions = new AddressParseOptions {
-                SplitRemainder  = true,
-                BestEffort      = bestEffort,
-                NormalizeNumber = normalizeNumber,
-                NormalizeOaza   = normalizeOaza,
-            };
-            var results = new List<ParseResultDto>(addresses.Count);
-            foreach (var address in addresses) {
-                var result = await svc.ParseAsync(address, parseOptions, ct);
-                results.Add(ParseDtoMapper.ToDto(address, result));
-            }
+                var parseOptions = new AddressParseOptions {
+                    SplitRemainder  = splitRemainder,
+                    BestEffort      = bestEffort,
+                    NormalizeNumber = normalizeNumber,
+                    NormalizeOaza   = normalizeOaza,
+                };
+                var results = new List<ParseResultDto>(addresses.Count);
+                foreach (var address in addresses) {
+                    var result = await svc.ParseAsync(address, parseOptions, ct);
+                    results.Add(ParseDtoMapper.ToDto(address, result));
+                }
 
-            var tsv = TsvService.BuildResult(results);
-            return Results.File(
-                System.Text.Encoding.UTF8.GetBytes(tsv),
-                contentType: "text/tab-separated-values",
-                fileDownloadName: "result.tsv");
-        })
+                var tsv = TsvService.BuildResult(results);
+                return Results.File(
+                    System.Text.Encoding.UTF8.GetBytes(tsv),
+                    contentType: "text/tab-separated-values",
+                    fileDownloadName: "result.tsv");
+            })
         .WithSummary("TSVファイルで住所を一括パースする")
         .DisableAntiforgery();
     }

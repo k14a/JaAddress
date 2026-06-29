@@ -3,6 +3,8 @@ namespace JaAddress.Api.Models;
 public sealed class ParseRequest {
     public IReadOnlyList<string> Addresses { get; init; } = [];
     public bool BestEffort { get; init; } = false;
+    /// <summary>true の場合、町字・Street・Block まで分割する。</summary>
+    public bool SplitRemainder { get; init; } = true;
     /// <summary>全角数字・ハイフン類を半角に正規化するか。</summary>
     public bool NormalizeNumber { get; init; } = true;
     /// <summary>
