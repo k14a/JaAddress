@@ -215,6 +215,14 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
     }
 
     [Fact]
+    public async Task ParseAsync_都道府県名重複入力_nullを返す() {
+        // "東京都" が重複 → 市区町村が特定できないためnull
+        // 渋谷区の1文字町字「東」への誤マッチを防ぐ回帰テスト
+        var result = await this._sut.ParseAsync("東京都東京都新宿区西新宿1-2-3");
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task ParseAsync_通常マッチ_CorrectedがFalse() {
         var result = await this._sut.ParseAsync("東京都新宿区西新宿");
 

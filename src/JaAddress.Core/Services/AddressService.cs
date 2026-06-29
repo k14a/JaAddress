@@ -263,6 +263,7 @@ internal sealed class AddressService(
         foreach (var city in cities.OrderByDescending(c => c.DisplayName.Length)) {
             var towns = await this.GetTownsAsync(prefName, city.Name, ct);
             var town = towns
+                .Where(t => t.Name.Length >= 2)
                 .OrderByDescending(t => t.Name.Length)
                 .FirstOrDefault(t => input.StartsWith(t.Name));
             if (town is not null) {
