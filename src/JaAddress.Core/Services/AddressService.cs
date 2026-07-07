@@ -318,10 +318,10 @@ internal sealed class AddressService(
                 var pt = g.First().Point;
                 return new Town {
                     PrefectureName = prefName,
-                    CityName       = cityName,
-                    Name           = g.Key,
-                    Latitude       = pt is { Length: > 1 } ? (decimal)pt[1] : null,
-                    Longitude      = pt is { Length: > 0 } ? (decimal)pt[0] : null,
+                    CityName = cityName,
+                    Name = g.Key,
+                    Latitude = pt is { Length: > 1 } ? (decimal)pt[1] : null,
+                    Longitude = pt is { Length: > 0 } ? (decimal)pt[0] : null,
                 };
             })
             .ToList()
