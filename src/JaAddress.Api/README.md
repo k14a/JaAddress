@@ -5,6 +5,39 @@ Swagger UI は起動後に `http://localhost:5000/swagger` で確認できます
 
 ---
 
+## 起動方法
+
+### `dotnet run`
+
+リポジトリルートに `data/` ディレクトリ（`JaAddress.DataBuilder` の出力）が必要です。
+
+```bash
+dotnet run --project src/JaAddress.Api
+```
+
+### Docker
+
+リポジトリルートの [`Dockerfile.api`](../../Dockerfile.api) からイメージをビルドし、
+`JaAddress.DataBuilder`（[`Dockerfile`](../../Dockerfile)）が出力した `data/` ディレクトリをボリュームマウントして起動します。
+
+```bash
+# イメージのビルド（リポジトリルートで実行）
+docker build -f Dockerfile.api -t jaaddress-api .
+
+# data/ ディレクトリをマウントして起動
+docker run -p 8080:8080 -v "$(pwd)/data:/data:ro" jaaddress-api
+```
+
+起動後、`http://localhost:8080/swagger` で Swagger UI を確認できます。
+
+| 環境変数 | 既定値 | 説明 |
+|---------|-------|------|
+| `JaAddress__DataDirectory` | `/data` | 町字データディレクトリのパス |
+| `ASPNETCORE_ENVIRONMENT` | `Development` | `Development` の場合のみ Swagger UI が有効 |
+| `ASPNETCORE_URLS` | `http://+:8080` | リッスンするアドレス・ポート |
+
+---
+
 ## 住所マスター
 
 ### `GET /prefectures` — 都道府県一覧
