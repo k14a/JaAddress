@@ -16,7 +16,9 @@ internal sealed class AddressService(
     private readonly ILogger<AddressService> _logger = logger;
 
     // キャッシュ
+    private JaRootResponse? _jaRoot;
     private IReadOnlyList<Prefecture>? _prefectures;
+    private readonly ConcurrentDictionary<string, IReadOnlyList<City>> _cityCache = new();
     private readonly ConcurrentDictionary<string, IReadOnlyList<Town>> _townCache = new();
     private readonly ConcurrentDictionary<string, IReadOnlyList<TownEntry>> _rawEntryCache = new();
 
@@ -32,11 +34,7 @@ internal sealed class AddressService(
             return this._prefectures;
         }
 
-        var path = Path.Combine(this._dataDir, "ja.json");
-        this._logger.LogDebug("都道府県データを読み込み中: {Path}", path);
-
-        var root = await LoadJsonAsync<JaRootResponse>(path, ct)
-            ?? throw new InvalidOperationException($"都道府県データの読み込みに失敗しました: {path}");
+        var root = await this.LoadJaRootAsync(ct);
 
         this._prefectures = root.Data
             .Select(p => new Prefecture {
@@ -55,14 +53,16 @@ internal sealed class AddressService(
     // 市区町村一覧
     // -------------------------------------------------------
     public async Task<IReadOnlyList<City>> GetCitiesAsync(string prefName, CancellationToken ct = default) {
-        var path = Path.Combine(this._dataDir, "ja.json");
-        var root = await LoadJsonAsync<JaRootResponse>(path, ct)
-            ?? throw new InvalidOperationException($"都道府県データの読み込みに失敗しました: {path}");
+        if (this._cityCache.TryGetValue(prefName, out var cached)) {
+            return cached;
+        }
+
+        var root = await this.LoadJaRootAsync(ct);
 
         var pref = root.Data.FirstOrDefault(p => p.Pref == prefName)
             ?? throw new ArgumentException($"都道府県が見つかりません: {prefName}");
 
-        return pref.Cities
+        var cities = pref.Cities
             .Select(c => new City {
                 Code = c.Code,
                 PrefectureName = prefName,
@@ -76,6 +76,9 @@ internal sealed class AddressService(
             })
             .ToList()
             .AsReadOnly();
+
+        this._cityCache[prefName] = cities;
+        return cities;
     }
 
     // -------------------------------------------------------
@@ -334,9 +337,7 @@ internal sealed class AddressService(
     private async Task<IReadOnlyList<Town>> AggregateSubCityTownsAsync(
         string prefName, string baseName, CancellationToken ct) {
 
-        var jaPath = Path.Combine(this._dataDir, "ja.json");
-        var root = await LoadJsonAsync<JaRootResponse>(jaPath, ct);
-        if (root is null) { return []; }
+        var root = await this.LoadJaRootAsync(ct);
 
         var pref = root.Data.FirstOrDefault(p => p.Pref == prefName);
         if (pref is null) { return []; }
@@ -465,6 +466,20 @@ internal sealed class AddressService(
 
         // 番地なし（建物名・フロア等が続く場合）
         return (street, string.Empty, afterStreet);
+    }
+
+    private async Task<JaRootResponse> LoadJaRootAsync(CancellationToken ct) {
+        if (this._jaRoot is not null) {
+            return this._jaRoot;
+        }
+
+        var path = Path.Combine(this._dataDir, "ja.json");
+        this._logger.LogDebug("都道府県データを読み込み中: {Path}", path);
+
+        this._jaRoot = await LoadJsonAsync<JaRootResponse>(path, ct)
+            ?? throw new InvalidOperationException($"都道府県データの読み込みに失敗しました: {path}");
+
+        return this._jaRoot;
     }
 
     private static async Task<T?> LoadJsonAsync<T>(string path, CancellationToken ct) {

@@ -417,4 +417,37 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Null(result.Street);
         Assert.Null(result.Block);
     }
+
+    // -------------------------------------------------------
+    // キャッシュ有効性
+    // -------------------------------------------------------
+    [Fact]
+    public async Task GetPrefecturesAsync_2回呼び出し_同一インスタンスを返す() {
+        var first = await this._sut.GetPrefecturesAsync();
+        var second = await this._sut.GetPrefecturesAsync();
+
+        Assert.True(ReferenceEquals(first, second));
+    }
+
+    [Fact]
+    public async Task GetCitiesAsync_同一都道府県を2回呼び出し_同一インスタンスを返す() {
+        var first = await this._sut.GetCitiesAsync("東京都");
+        var second = await this._sut.GetCitiesAsync("東京都");
+
+        Assert.True(ReferenceEquals(first, second));
+    }
+
+    [Fact]
+    public async Task ParseAsync_複数回呼び出し後のGetCitiesAsync_キャッシュ済みインスタンスを返す() {
+        // ParseAsync 内部でも GetCitiesAsync が呼ばれるため、
+        // ParseAsync 呼び出し後も GetCitiesAsync が同一インスタンスを返すことを確認する
+        var before = await this._sut.GetCitiesAsync("東京都");
+
+        await this._sut.ParseAsync("東京都新宿区西新宿1丁目2-3");
+        await this._sut.ParseAsync("東京都千代田区丸の内1丁目");
+
+        var after = await this._sut.GetCitiesAsync("東京都");
+
+        Assert.True(ReferenceEquals(before, after));
+    }
 }
