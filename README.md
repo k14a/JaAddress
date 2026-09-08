@@ -105,6 +105,22 @@ public class MyService(IAddressService addressService) {
 | `NormalizeNumber` | `bool` | `true` | 全角数字・ハイフン類を半角に変換してから解析する |
 | `BestEffort` | `bool` | `false` | 入力の先頭以外に都道府県名が見つかった場合も解析を試みる。`Offset` で開始位置を返す |
 | `NormalizeOaza` | `bool` | `true` | 「大字」省略入力（例: `久保`）をデータ上の正規形（例: `大字久保`）に照合する |
+| `FoldItaiji` | `bool?` | `null` | このリクエストで異体字（旧字体）畳み込みを行うか。`null` はサーバ設定（`JaAddressOptions.FoldItaiji`）に従う。`false` で明示的に無効化できる |
+
+### 異体字（旧字体）の畳み込み
+
+`JaAddressOptions.FoldItaiji = true`（既定 `false` のオプトイン）にすると、`惠→恵`・`舘→館` などの
+異体字を正規形へ畳み込んでから住所照合を行う。入力文字列と住所辞書の名称の双方に同じマップを適用するため、
+「須惠町」(惠) と「須恵町」(恵) の揺れを吸収できる（NFKC 正規化では畳み込まれない）。
+出力の `City.Name` / `Town.Name` は辞書の元表記（正式表記）を保持する。
+
+| `JaAddressOptions` プロパティ | 説明 |
+|---|---|
+| `FoldItaiji` | 畳み込みを有効にする |
+| `ItaijiMapPath` | 追加の異体字マップ TSV（`変換元<TAB>変換先`、1 文字 → 1 文字）。既定の埋め込みマップにマージ |
+| `AdditionalItaiji` | コードから追加する `IReadOnlyDictionary<char,char>` |
+
+データディレクトリ直下に `itaiji.local.tsv` を置いてもマージされる（優先度: 既定 < `ItaijiMapPath` < `itaiji.local.tsv` < `AdditionalItaiji`）。
 
 ### `AddressParseResult`
 
