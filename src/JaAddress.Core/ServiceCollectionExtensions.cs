@@ -10,6 +10,7 @@ public static class ServiceCollectionExtensions {
         JaAddressOptions options) {
 
         services.AddSingleton(options);
+        services.AddSingleton<IItaijiFolder, ItaijiFolder>();
         services.AddSingleton<IAddressService, AddressService>();
         return services;
     }

@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- 異体字（旧字体・許容字体）の畳み込み機能（`JaAddressOptions.FoldItaiji`、既定 false のオプトイン）。
+  有効時、入力住所文字列と住所辞書の名称の双方に変換マップを適用してから照合するため、
+  「須惠町」(惠) と「須恵町」(恵) のような字体の揺れを吸収できる（NFKC では畳み込まれない）。
+- 既定の異体字マップを埋め込みリソース `Resources/itaiji.tsv` として同梱。
+  `JaAddressOptions.ItaijiMapPath`（外部 TSV）、データディレクトリ直下の `itaiji.local.tsv`、
+  `JaAddressOptions.AdditionalItaiji`（コード）で利用者が追加・上書き可能。
+- `IItaijiFolder` を DI で公開（呼び出し側で同じマップを再利用可能）。
+- `AddressParseOptions.FoldItaiji`（`bool?`）でリクエスト単位の無効化に対応。
+- API：`JaAddress:FoldItaiji` / `JaAddress:ItaijiMapPath` 設定、各 `/parse` エンドポイントの
+  `foldItaiji` パラメータ、`POST /parse` の `foldItaiji` フィールドを追加。
+
 ## [0.1.1] - 2026-07-08
 
 ### Added

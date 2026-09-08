@@ -55,6 +55,7 @@ dotnet run --project src/JaAddress.DataBuilder -- --output ./data --pref 東京�
 2. 残りが市区町村名で始まるか照合（長い名前を優先して誤検知防止）
 3. `SplitRemainder=true` の場合、さらに町字・Street（`1丁目`等）・Block（`2-3`等）に分割
 4. `NormalizeNumber=true`（デフォルト）の場合、全角数字・ハイフン類を事前に半角変換
+5. `JaAddressOptions.FoldItaiji=true`（既定 false）の場合、異体字（旧字体）を正規形へ畳み込んでから照合。入力と辞書名称の双方に同じマップ（`ItaijiFolder`／埋め込み `Resources/itaiji.tsv` ＋利用者追加分）を適用する。1文字→1文字変換のためオフセット計算に影響しない。出力の `City.Name`／`Town.Name` は辞書の元表記（正式表記）を保持する
 
 ### 町字 JSON のフォーマット
 

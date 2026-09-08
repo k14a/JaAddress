@@ -15,6 +15,8 @@ var dataDirectory = builder.Configuration["JaAddress:DataDirectory"]
 
 builder.Services.AddJaAddress(new JaAddressOptions {
     DataDirectory = dataDirectory,
+    FoldItaiji = builder.Configuration.GetValue<bool>("JaAddress:FoldItaiji"),
+    ItaijiMapPath = builder.Configuration["JaAddress:ItaijiMapPath"],
 });
 
 builder.Services.AddAntiforgery();

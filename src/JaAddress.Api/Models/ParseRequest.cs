@@ -12,4 +12,10 @@ public sealed class ParseRequest {
     /// 正規形（大字付き）の町字名を返す。
     /// </summary>
     public bool NormalizeOaza { get; init; } = true;
+
+    /// <summary>
+    /// このリクエストで異体字（旧字体）の畳み込みを行うか。null（既定）はサーバ設定
+    /// （JaAddress:FoldItaiji）に従う。サーバ設定が false のときは true にしても効果はない。
+    /// </summary>
+    public bool? FoldItaiji { get; init; }
 }

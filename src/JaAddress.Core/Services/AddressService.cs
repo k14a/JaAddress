@@ -10,10 +10,15 @@ namespace JaAddress.Core.Services;
 
 internal sealed class AddressService(
     JaAddressOptions options,
+    IItaijiFolder itaijiFolder,
     ILogger<AddressService> logger) : IAddressService {
 
     private readonly string _dataDir = options.DataDirectory;
+    private readonly JaAddressOptions _options = options;
+    private readonly IItaijiFolder _itaijiFolder = itaijiFolder;
     private readonly ILogger<AddressService> _logger = logger;
+
+    private static readonly Func<string, string> Identity = static s => s;
 
     // キャッシュ
     private JaRootResponse? _jaRoot;
@@ -119,19 +124,27 @@ internal sealed class AddressService(
         options ??= new AddressParseOptions();
         var input = options.NormalizeNumber ? NormalizeNumber(address) : address;
 
+        // 異体字（旧字体）の畳み込み。入力と辞書名称の双方に同じマップを適用する。
+        // 1 文字 → 1 文字の置換なので、以降のオフセット計算（*.Length による slice）は影響を受けない。
+        var foldItaiji = this._itaijiFolder.Enabled && (options.FoldItaiji ?? true);
+        var fold = foldItaiji ? this._itaijiFolder.Fold : Identity;
+        if (foldItaiji) {
+            input = this._itaijiFolder.Fold(input);
+        }
+
         // 都道府県を特定
         var prefectures = await this.GetPrefecturesAsync(ct);
         Prefecture? prefecture;
         int offset;
 
         if (options.BestEffort) {
-            (prefecture, offset) = FindPrefectureInText(input, prefectures);
+            (prefecture, offset) = FindPrefectureInText(input, prefectures, fold);
             if (offset > 0) {
                 input = input[offset..];
                 this._logger.LogDebug("BestEffort: offset={Offset} で住所を検出しました: {Address}", offset, address);
             }
         } else {
-            prefecture = prefectures.FirstOrDefault(p => input.StartsWith(p.Name));
+            prefecture = prefectures.FirstOrDefault(p => input.StartsWith(fold(p.Name)));
             offset = 0;
         }
 
@@ -140,13 +153,14 @@ internal sealed class AddressService(
             return null;
         }
 
+        // 異体字マップは 1 文字 → 1 文字のため、畳み込み後も文字列長は不変（Name.Length で slice して問題ない）
         var afterPref = input[prefecture.Name.Length..];
 
         // 市区町村を特定
         var cities = await this.GetCitiesAsync(prefecture.Name, ct);
         var city = cities
             .OrderByDescending(c => c.DisplayName.Length)
-            .FirstOrDefault(c => afterPref.StartsWith(c.DisplayName));
+            .FirstOrDefault(c => afterPref.StartsWith(fold(c.DisplayName)));
 
         var corrected = false;
         Town? correctedTown = null;
@@ -156,7 +170,7 @@ internal sealed class AddressService(
             city = cities
                 .Where(c => c.Ward is not null)
                 .OrderByDescending(c => c.Ward!.Length)
-                .FirstOrDefault(c => afterPref.StartsWith(c.Ward!));
+                .FirstOrDefault(c => afterPref.StartsWith(fold(c.Ward!)));
             if (city is not null) {
                 corrected = true;
                 this._logger.LogDebug("区名省略を補正しました: {Ward} → {DisplayName}", city.Ward, city.DisplayName);
@@ -165,7 +179,7 @@ internal sealed class AddressService(
 
         // 補正2: city完全省略 "西新宿…" → 町字から市区町村を逆引き
         if (city is null) {
-            (city, correctedTown) = await this.FindCityByTownAsync(prefecture.Name, afterPref, cities, ct);
+            (city, correctedTown) = await this.FindCityByTownAsync(prefecture.Name, afterPref, cities, fold, ct);
             if (city is not null) {
                 corrected = true;
                 this._logger.LogDebug("市区町村省略を補正しました: {Town} → {City}", correctedTown!.Name, city.DisplayName);
@@ -177,7 +191,7 @@ internal sealed class AddressService(
             city = cities
                 .Where(c => c.County is not null)
                 .OrderByDescending(c => c.Name.Length - c.County!.Length)
-                .FirstOrDefault(c => afterPref.StartsWith(c.Name[c.County!.Length..]));
+                .FirstOrDefault(c => afterPref.StartsWith(fold(c.Name[c.County!.Length..])));
             if (city is not null) {
                 corrected = true;
                 this._logger.LogDebug("郡名省略を補正しました: {City}", city.DisplayName);
@@ -217,7 +231,7 @@ internal sealed class AddressService(
             consumedTownLength = town.Name.Length;
         } else {
             var towns = await this.GetTownsAsync(prefecture.Name, city.Name, ct);
-            (town, consumedTownLength) = FindTown(remainder, towns, options.NormalizeOaza);
+            (town, consumedTownLength) = FindTown(remainder, towns, options.NormalizeOaza, fold);
         }
 
         if (town is null) {
@@ -261,6 +275,7 @@ internal sealed class AddressService(
         string prefName,
         string input,
         IReadOnlyList<City> cities,
+        Func<string, string> fold,
         CancellationToken ct) {
 
         foreach (var city in cities.OrderByDescending(c => c.DisplayName.Length)) {
@@ -268,7 +283,7 @@ internal sealed class AddressService(
             var town = towns
                 .Where(t => t.Name.Length >= 2)
                 .OrderByDescending(t => t.Name.Length)
-                .FirstOrDefault(t => input.StartsWith(t.Name));
+                .FirstOrDefault(t => input.StartsWith(fold(t.Name)));
             if (town is not null) {
                 return (city, town);
             }
@@ -281,13 +296,13 @@ internal sealed class AddressService(
     /// 見つからない場合は (null, 0)。
     /// </summary>
     private static (Prefecture? Prefecture, int Offset) FindPrefectureInText(
-        string input, IReadOnlyList<Prefecture> prefectures) {
+        string input, IReadOnlyList<Prefecture> prefectures, Func<string, string> fold) {
 
         Prefecture? found = null;
         var foundOffset = int.MaxValue;
 
         foreach (var pref in prefectures) {
-            var idx = input.IndexOf(pref.Name, StringComparison.Ordinal);
+            var idx = input.IndexOf(fold(pref.Name), StringComparison.Ordinal);
             if (idx >= 0 && idx < foundOffset) {
                 found = pref;
                 foundOffset = idx;
@@ -395,15 +410,16 @@ internal sealed class AddressService(
     /// 正規形（大字付き）の Town を返す。戻り値の ConsumedLength は入力から消費した文字数。
     /// </summary>
     private static (Town? Town, int ConsumedLength) FindTown(
-        string remainder, IReadOnlyList<Town> towns, bool normalizeOaza) {
+        string remainder, IReadOnlyList<Town> towns, bool normalizeOaza, Func<string, string> fold) {
 
         // 名前が長い順に検索（長い名前を優先して誤検知を防ぐ）
         foreach (var t in towns.OrderByDescending(t => t.Name.Length)) {
-            if (remainder.StartsWith(t.Name)) {
+            var foldedName = fold(t.Name);
+            if (remainder.StartsWith(foldedName)) {
                 return (t, t.Name.Length);
             }
-            if (normalizeOaza && t.Name.Length > 2 && t.Name.StartsWith("大字")
-                && remainder.StartsWith(t.Name[2..])) {
+            if (normalizeOaza && foldedName.Length > 2 && foldedName.StartsWith("大字")
+                && remainder.StartsWith(foldedName[2..])) {
                 return (t, t.Name.Length - 2);
             }
         }

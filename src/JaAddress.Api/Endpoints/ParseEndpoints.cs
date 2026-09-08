@@ -18,13 +18,15 @@ internal static class ParseEndpoints {
             bool bestEffort = false,
             bool splitRemainder = true,
             bool normalizeNumber = true,
-            bool normalizeOaza = true) => {
+            bool normalizeOaza = true,
+            bool? foldItaiji = null) => {
 
                 var options = new AddressParseOptions {
                     SplitRemainder  = splitRemainder,
                     BestEffort      = bestEffort,
                     NormalizeNumber = normalizeNumber,
                     NormalizeOaza   = normalizeOaza,
+                    FoldItaiji      = foldItaiji,
                 };
                 var result = await svc.ParseAsync(q, options, ct);
                 var dto = ParseDtoMapper.ToDto(q, result);
@@ -49,6 +51,7 @@ internal static class ParseEndpoints {
                     BestEffort      = request.BestEffort,
                     NormalizeNumber = request.NormalizeNumber,
                     NormalizeOaza   = request.NormalizeOaza,
+                    FoldItaiji      = request.FoldItaiji,
                 };
                 var results = new List<ParseResultDto>(request.Addresses.Count);
                 foreach (var address in request.Addresses) {
@@ -82,7 +85,8 @@ internal static class ParseEndpoints {
             bool bestEffort = false,
             bool splitRemainder = true,
             bool normalizeNumber = true,
-            bool normalizeOaza = true) => {
+            bool normalizeOaza = true,
+            bool? foldItaiji = null) => {
 
                 var max = apiOptions.Value.MaxTsvRows;
                 await using var stream = file.OpenReadStream();
@@ -96,6 +100,7 @@ internal static class ParseEndpoints {
                     BestEffort      = bestEffort,
                     NormalizeNumber = normalizeNumber,
                     NormalizeOaza   = normalizeOaza,
+                    FoldItaiji      = foldItaiji,
                 };
                 var results = new List<ParseResultDto>(addresses.Count);
                 foreach (var address in addresses) {
