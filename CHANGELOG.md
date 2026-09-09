@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AddressParseOptions.FoldItaiji`（`bool?`）でリクエスト単位の無効化に対応。
 - API：`JaAddress:FoldItaiji` / `JaAddress:ItaijiMapPath` 設定、各 `/parse` エンドポイントの
   `foldItaiji` パラメータ、`POST /parse` の `foldItaiji` フィールドを追加。
+- `JaAddress.Integration.Tests`：リポジトリ直下の `data/`（DataBuilder 生成の本番相当データ）を
+  そのまま読み込む結合テストを追加。`data/` が無い環境ではスキップされる。
+
+### Security
+
+- `Microsoft.OpenApi` を推移的依存の 2.4.1 から 2.7.5 へ明示的に引き上げ（`JaAddress.Api`）。
+  循環スキーマ参照によるスタックオーバーフローの脆弱性 [GHSA-v5pm-xwqc-g5wc](https://github.com/advisories/GHSA-v5pm-xwqc-g5wc)（高）に対応。
 
 ## [0.1.1] - 2026-07-08
 

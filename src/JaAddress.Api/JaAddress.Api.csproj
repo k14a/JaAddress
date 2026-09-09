@@ -9,6 +9,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.6" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+    <!-- 推移的依存の Microsoft.OpenApi 2.4.1 に GHSA-v5pm-xwqc-g5wc（循環スキーマ参照によるスタックオーバーフロー、高）があるため、
+         修正版へ明示的に引き上げる。上位パッケージが安全なバージョンを参照するようになったら削除可。 -->
+    <PackageReference Include="Microsoft.OpenApi" Version="2.7.5" />
   </ItemGroup>
 
   <ItemGroup>
