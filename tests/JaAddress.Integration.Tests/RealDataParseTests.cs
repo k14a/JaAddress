@@ -100,4 +100,42 @@ public sealed class RealDataParseTests(RealDataFixture fixture) : IClassFixture<
         Assert.Equal("新宿区", result.City.Name);
         Assert.Null(result.Town);
     }
+
+    // -------------------------------------------------------
+    // ParseAsync（勤務地テキストの表記ゆれ: 町名重複・都道府県の複数出現）
+    // -------------------------------------------------------
+    [SkippableTheory]
+    [InlineData("⻄⿇布　りんどう 106-0031東京都港区西麻布西麻布１丁目１１番１３号 地図を見る",
+        "港区", "西麻布", "1丁目", "11-13")]
+    [InlineData("株式会社バディデータ 101-0047東京都千代田区内神田内神田２丁目１３番８号ＢＭビル２階 地図を見る",
+        "千代田区", "内神田", "2丁目", "13-8")]
+    public async Task ParseAsync_BestEffort_町名が連続重複_重複を読み飛ばして番地まで取れる(
+        string address, string expectedCity, string expectedTown, string expectedStreet, string expectedBlock) {
+        var options = new AddressParseOptions {
+            SplitRemainder = true, NormalizeNumber = true, BestEffort = true, NormalizeOaza = true,
+        };
+        var result = await this.Sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("東京都", result.Prefecture.Name);
+        Assert.Equal(expectedCity, result.City.Name);
+        Assert.Equal(expectedTown, result.Town?.Name);
+        Assert.Equal(expectedStreet, result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+    }
+
+    [SkippableFact]
+    public async Task ParseAsync_BestEffort_会社名の括弧内に別の住所_後続の完全な住所を採用する() {
+        var options = new AddressParseOptions {
+            SplitRemainder = true, NormalizeNumber = true, BestEffort = true, NormalizeOaza = true,
+        };
+        var result = await this.Sut.ParseAsync(
+            "ハーベスト株式会社(東京都中央区内の社員食堂) 東京都中央区日本橋本石町1-1-9 地図を見る", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("中央区", result.City.Name);
+        Assert.Equal("日本橋本石町", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("1-9", result.Block);
+    }
 }

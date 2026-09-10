@@ -134,27 +134,63 @@ internal sealed class AddressService(
 
         // 都道府県を特定
         var prefectures = await this.GetPrefecturesAsync(ct);
-        Prefecture? prefecture;
-        int offset;
 
-        if (options.BestEffort) {
-            (prefecture, offset) = FindPrefectureInText(input, prefectures, fold);
-            if (offset > 0) {
-                input = input[offset..];
-                this._logger.LogDebug("BestEffort: offset={Offset} で住所を検出しました: {Address}", offset, address);
+        if (!options.BestEffort) {
+            var prefecture = prefectures.FirstOrDefault(p => input.StartsWith(fold(p.Name)));
+            if (prefecture is null) {
+                this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);
+                return null;
             }
-        } else {
-            prefecture = prefectures.FirstOrDefault(p => input.StartsWith(fold(p.Name)));
-            offset = 0;
+            return await this.TryParseFromAsync(input, prefecture, offset: 0, options, fold, ct);
         }
 
-        if (prefecture is null) {
+        // BestEffort: テキスト中に出現するすべての都道府県名の位置を候補として解析し、
+        // 最も情報量の多い（町字・番地まで取れた）結果を採用する。
+        // 会社名などノイズに紛れた都道府県名を先に掴んで解析失敗するケースを避けるため。
+        // 例: "ハーベスト株式会社(東京都中央区内の社員食堂) 東京都中央区日本橋本石町1-1-9"
+        var occurrences = FindAllPrefectureOccurrences(input, prefectures, fold);
+        if (occurrences.Count == 0) {
             this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);
             return null;
         }
 
+        AddressParseResult? best = null;
+        var bestScore = int.MinValue;
+        foreach (var (prefecture, occOffset) in occurrences) {
+            var candidate = await this.TryParseFromAsync(input[occOffset..], prefecture, occOffset, options, fold, ct);
+            if (candidate is null) {
+                continue;
+            }
+            var score = CompletenessScore(candidate);
+            // 同点は occurrences が offset 昇順のため先勝ち（従来どおり早い出現位置を優先）
+            if (score > bestScore) {
+                best = candidate;
+                bestScore = score;
+                if (score == MaxCompletenessScore) {
+                    break;
+                }
+            }
+        }
+
+        if (best is null) {
+            this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);
+        } else if (best.Offset > 0) {
+            this._logger.LogDebug("BestEffort: offset={Offset} で住所を検出しました: {Address}", best.Offset, address);
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// 都道府県が確定した位置から市区町村・町字・Street・Block を解析する。
+    /// <paramref name="text"/> は都道府県名で始まる文字列、<paramref name="offset"/> は
+    /// 元の入力文字列における <paramref name="text"/> の開始位置（結果の Offset に格納する）。
+    /// </summary>
+    private async Task<AddressParseResult?> TryParseFromAsync(
+        string text, Prefecture prefecture, int offset,
+        AddressParseOptions options, Func<string, string> fold, CancellationToken ct) {
+
         // 異体字マップは 1 文字 → 1 文字のため、畳み込み後も文字列長は不変（Name.Length で slice して問題ない）
-        var afterPref = input[prefecture.Name.Length..];
+        var afterPref = text[prefecture.Name.Length..];
 
         // 市区町村を特定
         var cities = await this.GetCitiesAsync(prefecture.Name, ct);
@@ -199,7 +235,7 @@ internal sealed class AddressService(
         }
 
         if (city is null) {
-            this._logger.LogDebug("市区町村を特定できませんでした: {Address}", address);
+            this._logger.LogDebug("市区町村を特定できませんでした: {Text}", text);
             return null;
         }
 
@@ -246,6 +282,17 @@ internal sealed class AddressService(
 
         var afterTown = remainder[consumedTownLength..];
 
+        // 町名がそのまま連続で重複している場合（例: "西新宿西新宿1丁目…"）は重複分を読み飛ばす。
+        // 元データ（勤務地テキスト等）で町名が二重記載されるケースへの対応。
+        // 1 文字町字での過剰消費を避けるため 2 文字以上の町名のみ対象とする。
+        var foldedTownName = fold(town.Name);
+        if (foldedTownName.Length >= 2) {
+            while (afterTown.StartsWith(foldedTownName)) {
+                this._logger.LogDebug("重複した町名 {Town} を読み飛ばしました", town.Name);
+                afterTown = afterTown[foldedTownName.Length..];
+            }
+        }
+
         // 丁目名をデータから引くために生エントリを使う（GetTownsAsync 内でキャッシュ済み）
         var rawEntries = await this.LoadTownEntriesAsync(prefecture.Name, city.Name, ct);
         var chomeEntries = rawEntries.Where(e => e.OazaCho == town.Name).ToList();
@@ -262,6 +309,14 @@ internal sealed class AddressService(
             Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterTown : tail,
         };
     }
+
+    /// <summary>解析結果の情報量（大きいほど詳細）。BestEffort の候補選択に使う。</summary>
+    private const int MaxCompletenessScore = 3;
+
+    private static int CompletenessScore(AddressParseResult result) =>
+        result.Town is not null && (result.Street is not null || result.Block is not null) ? 3 :
+        result.Town is not null ? 2 :
+        1;
 
     // -------------------------------------------------------
     // ユーティリティ
@@ -292,24 +347,31 @@ internal sealed class AddressService(
     }
 
     /// <summary>
-    /// 入力文字列中で最初に出現する都道府県名とその位置を返す。
-    /// 見つからない場合は (null, 0)。
+    /// 入力文字列中に出現するすべての都道府県名とその位置を、位置の昇順で返す。
+    /// 同一都道府県が複数回出現する場合はそのすべてを含む。見つからない場合は空。
     /// </summary>
-    private static (Prefecture? Prefecture, int Offset) FindPrefectureInText(
+    private static IReadOnlyList<(Prefecture Prefecture, int Offset)> FindAllPrefectureOccurrences(
         string input, IReadOnlyList<Prefecture> prefectures, Func<string, string> fold) {
 
-        Prefecture? found = null;
-        var foundOffset = int.MaxValue;
+        var occurrences = new List<(Prefecture Prefecture, int Offset)>();
 
         foreach (var pref in prefectures) {
-            var idx = input.IndexOf(fold(pref.Name), StringComparison.Ordinal);
-            if (idx >= 0 && idx < foundOffset) {
-                found = pref;
-                foundOffset = idx;
+            var name = fold(pref.Name);
+            if (name.Length == 0) {
+                continue;
+            }
+            var start = 0;
+            while (start <= input.Length) {
+                var idx = input.IndexOf(name, start, StringComparison.Ordinal);
+                if (idx < 0) {
+                    break;
+                }
+                occurrences.Add((pref, idx));
+                start = idx + name.Length;
             }
         }
 
-        return (found, found is not null ? foundOffset : 0);
+        return occurrences.OrderBy(o => o.Offset).ToList();
     }
 
     /// <summary>全角数字・ハイフン類を半角に正規化する。</summary>

@@ -147,6 +147,19 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Null(result.Block);
     }
 
+    [Theory]
+    [InlineData("東京都新宿区西新宿西新宿1-2-3")]         // 町名が2連続
+    [InlineData("東京都新宿区西新宿西新宿西新宿1-2-3")]   // 町名が3連続
+    public async Task ParseAsync_SplitRemainder_町名が連続重複_重複を読み飛ばして分割する(string address) {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
     // -------------------------------------------------------
     // ParseAsync - NormalizeNumber
     // -------------------------------------------------------
@@ -259,6 +272,44 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         var result = await this._sut.ParseAsync("勤務地：東京都新宿区西新宿");
 
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task ParseAsync_BestEffort_都道府県が複数出現_最も詳細に解析できた候補を採用する() {
+        // 会社名の括弧内に別の「東京都○○区」が紛れ込むケース。
+        // 先頭側は町字が取れず、後続の完全な住所を採用する。
+        var options = new AddressParseOptions { BestEffort = true, SplitRemainder = true };
+        var result = await this._sut.ParseAsync(
+            "ハーベスト株式会社(東京都千代田区内の社員食堂) 東京都新宿区西新宿1-2-3 地図を見る", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("東京都", result.Prefecture.Name);
+        Assert.Equal("新宿区", result.City.Name);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_BestEffort_都道府県のみのノイズが先行_後続の完全な住所を採用する() {
+        var options = new AddressParseOptions { BestEffort = true, SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都で募集中 東京都新宿区西新宿1-2-3", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("西新宿", result.Town?.Name);
+        Assert.Equal("1丁目", result.Street);
+        Assert.Equal("2-3", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_BestEffort_同レベルの候補が複数_先に出現した方を採用する() {
+        // どちらも町字まで取れない場合は従来どおり最初の出現位置を優先する
+        var options = new AddressParseOptions { BestEffort = true };
+        var result = await this._sut.ParseAsync("東京都新宿区 または 東京都千代田区", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("新宿区", result.City.Name);
+        Assert.Equal(0, result.Offset);
     }
 
     // -------------------------------------------------------
