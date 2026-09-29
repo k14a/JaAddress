@@ -501,4 +501,66 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
 
         Assert.True(ReferenceEquals(before, after));
     }
+
+    // -------------------------------------------------------
+    // ParseWithReasonAsync（失敗理由付き）
+    // -------------------------------------------------------
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ParseWithReasonAsync_解析成功_ResultとNoneを返す(bool bestEffort) {
+        var options = new AddressParseOptions { BestEffort = bestEffort };
+        var outcome = await this._sut.ParseWithReasonAsync("東京都新宿区西新宿", options);
+
+        Assert.Equal(AddressParseFailureReason.None, outcome.FailureReason);
+        Assert.NotNull(outcome.Result);
+        Assert.Equal("新宿区", outcome.Result.City.Name);
+    }
+
+    [Theory]
+    [InlineData("存在しない県どこか市", false)]
+    [InlineData("存在しない県どこか市", true)]
+    [InlineData("", false)]
+    [InlineData("", true)]
+    // BestEffort=false では先頭が都道府県名で始まらなければ都道府県なし
+    [InlineData("勤務地：東京都新宿区西新宿", false)]
+    public async Task ParseWithReasonAsync_都道府県を特定できない_PrefectureNotFoundを返す(string address, bool bestEffort) {
+        var options = new AddressParseOptions { BestEffort = bestEffort };
+        var outcome = await this._sut.ParseWithReasonAsync(address, options);
+
+        Assert.Null(outcome.Result);
+        Assert.Equal(AddressParseFailureReason.PrefectureNotFound, outcome.FailureReason);
+    }
+
+    [Theory]
+    [InlineData("東京都", false)]
+    [InlineData("東京都", true)]
+    [InlineData("東京都存在しない市", false)]
+    [InlineData("勤務地：東京都存在しない市", true)]
+    // BestEffort=true で都道府県名が複数出現し、すべての出現位置で市区町村を特定できない
+    [InlineData("東京都不明 大阪府不明", true)]
+    public async Task ParseWithReasonAsync_市区町村を特定できない_CityNotFoundを返す(string address, bool bestEffort) {
+        var options = new AddressParseOptions { BestEffort = bestEffort };
+        var outcome = await this._sut.ParseWithReasonAsync(address, options);
+
+        Assert.Null(outcome.Result);
+        Assert.Equal(AddressParseFailureReason.CityNotFound, outcome.FailureReason);
+    }
+
+    [Theory]
+    [InlineData("東京都新宿区西新宿1丁目2-3", true)]
+    [InlineData("存在しない県どこか市", false)]
+    [InlineData("東京都存在しない市", false)]
+    public async Task ParseAsync_ParseWithReasonAsyncと同じ解析結果を返す(string address, bool expectedSuccess) {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync(address, options);
+        var outcome = await this._sut.ParseWithReasonAsync(address, options);
+
+        Assert.Equal(expectedSuccess, result is not null);
+        Assert.Equal(result is not null, outcome.Result is not null);
+        Assert.Equal(result?.City.Name, outcome.Result?.City.Name);
+        Assert.Equal(result?.Town?.Name, outcome.Result?.Town?.Name);
+        Assert.Equal(result?.Street, outcome.Result?.Street);
+        Assert.Equal(result?.Block, outcome.Result?.Block);
+    }
 }

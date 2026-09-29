@@ -43,4 +43,15 @@ internal sealed class FakeAddressService : IAddressService {
             Remainder  = string.Empty,
         });
     }
+
+    public async Task<AddressParseOutcome> ParseWithReasonAsync(
+        string address, AddressParseOptions? options = null, CancellationToken ct = default) {
+        var result = await this.ParseAsync(address, options, ct);
+        if (result is not null)
+            return AddressParseOutcome.Success(result);
+
+        return AddressParseOutcome.Failure(address.StartsWith("東京都")
+            ? AddressParseFailureReason.CityNotFound
+            : AddressParseFailureReason.PrefectureNotFound);
+    }
 }
