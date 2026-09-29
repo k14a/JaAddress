@@ -119,6 +119,12 @@ internal sealed class AddressService(
     public async Task<AddressParseResult?> ParseAsync(
         string address,
         AddressParseOptions? options = null,
+        CancellationToken ct = default) =>
+        (await this.ParseWithReasonAsync(address, options, ct)).Result;
+
+    public async Task<AddressParseOutcome> ParseWithReasonAsync(
+        string address,
+        AddressParseOptions? options = null,
         CancellationToken ct = default) {
 
         options ??= new AddressParseOptions();
@@ -139,9 +145,12 @@ internal sealed class AddressService(
             var prefecture = prefectures.FirstOrDefault(p => input.StartsWith(fold(p.Name)));
             if (prefecture is null) {
                 this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);
-                return null;
+                return AddressParseOutcome.Failure(AddressParseFailureReason.PrefectureNotFound);
             }
-            return await this.TryParseFromAsync(input, prefecture, offset: 0, options, fold, ct);
+            var result = await this.TryParseFromAsync(input, prefecture, offset: 0, options, fold, ct);
+            return result is null
+                ? AddressParseOutcome.Failure(AddressParseFailureReason.CityNotFound)
+                : AddressParseOutcome.Success(result);
         }
 
         // BestEffort: テキスト中に出現するすべての都道府県名の位置を候補として解析し、
@@ -151,7 +160,7 @@ internal sealed class AddressService(
         var occurrences = FindAllPrefectureOccurrences(input, prefectures, fold);
         if (occurrences.Count == 0) {
             this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);
-            return null;
+            return AddressParseOutcome.Failure(AddressParseFailureReason.PrefectureNotFound);
         }
 
         AddressParseResult? best = null;
@@ -172,12 +181,15 @@ internal sealed class AddressService(
             }
         }
 
+        // 都道府県名は出現したが、いずれの出現位置からも市区町村を特定できなかった
         if (best is null) {
-            this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);
-        } else if (best.Offset > 0) {
+            this._logger.LogDebug("市区町村を特定できませんでした: {Address}", address);
+            return AddressParseOutcome.Failure(AddressParseFailureReason.CityNotFound);
+        }
+        if (best.Offset > 0) {
             this._logger.LogDebug("BestEffort: offset={Offset} で住所を検出しました: {Address}", best.Offset, address);
         }
-        return best;
+        return AddressParseOutcome.Success(best);
     }
 
     /// <summary>
