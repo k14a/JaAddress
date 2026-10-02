@@ -341,6 +341,70 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Equal(string.Empty, result.Remainder);
     }
 
+    // -------------------------------------------------------
+    // ParseAsync - 丁目省略形で辞書にない丁目番号（番地の先頭の数字を落とさない）
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_辞書にない丁目番号_丁目とみなさず番地全体をBlockにする() {
+        // 歌舞伎町は一丁目・二丁目のみ。"13-9" は 13丁目ではなく番地 "13-9"（修正前は先頭の "13" を消費し Block="9" だった）
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区歌舞伎町13-9", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("歌舞伎町", result.Town?.Name);
+        Assert.Null(result.Street);
+        Assert.Equal("13-9", result.Block);
+        Assert.Equal(string.Empty, result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SplitRemainder_辞書にある丁目番号の省略形_従来どおり丁目と番地に分割する() {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this._sut.ParseAsync("東京都新宿区歌舞伎町2-5-1", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("歌舞伎町", result.Town?.Name);
+        Assert.Equal("2丁目", result.Street);
+        Assert.Equal("5-1", result.Block);
+    }
+
+    // -------------------------------------------------------
+    // ParseAsync - NormalizeOaza の大字を外した一致と、より長い町字の優先順位
+    // -------------------------------------------------------
+    [Fact]
+    public async Task ParseAsync_NormalizeOaza_より長く一致する町字を大字を外した一致より優先する() {
+        // 「大字本城」（大字を外すと「本城」＝2文字）より「本城東」（3文字）の方が長く一致する
+        // （修正前は Name.Length の長い「大字本城」が先に一致し、"東2丁目1-21" が Remainder になっていた）
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町本城東2丁目1-21", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("本城東", result.Town?.Name);
+        Assert.Equal("2丁目", result.Street);
+        Assert.Equal("1-21", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NormalizeOaza_大字を外した一致で正規形の大字付き町字を返す() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町吉野山123-4", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字吉野山", result.Town?.Name);
+        Assert.Equal("123-4", result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NormalizeOaza_消費文字数が同じ場合は従来どおり名前の長い町字を優先する() {
+        // 「本城」（入力どおり）と「大字本城」（大字を外して一致）はどちらも2文字消費。従来どおり Name.Length の長い「大字本城」を返す
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町本城123", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字本城", result.Town?.Name);
+        Assert.Equal("123", result.Block);
+    }
+
     [Fact]
     public async Task ParseAsync_郡省略_CorrectedがTrueで郡名が補完される() {
         var result = await this._sut.ParseAsync("奈良県吉野町大字吉野山");
