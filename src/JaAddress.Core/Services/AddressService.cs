@@ -310,15 +310,58 @@ internal sealed class AddressService(
         var chomeEntries = rawEntries.Where(e => e.OazaCho == town.Name).ToList();
         var (street, block, tail) = SplitStreetBlock(afterTown, chomeEntries);
 
+        // 丁目・番地が取れなかった場合、町字のあとに小字（"字大地内95-5" 等）があれば読み取り、その後ろを丁目・番地として分割する
+        string? koaza = null;
+        var afterKoaza = afterTown;
+        if (string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block)) {
+            var normalize = options.NormalizeNumber ? NormalizeNumber : Identity;
+            var koazaNames = chomeEntries
+                .Where(e => !string.IsNullOrEmpty(e.Koaza))
+                .Select(e => e.Koaza!)
+                .Distinct()
+                .ToList();
+            var dictionaryMatch = FindKoaza(afterTown, koazaNames, s => fold(normalize(s)));
+            var explicitMatch = Regex.Match(afterTown, @"^字[^0-9\-\s　]+?(?=[0-9])");
+
+            // 採用順：
+            // 1. 辞書の小字で、直後に丁目・番地が続くか住所がそこで終わるもの
+            //    （「字」の付かない小字は建物名等の先頭と偶然一致しうるため、この条件を満たす場合のみ採用する）
+            // 2. 辞書にない "字○○" で、直後に数字が続くもの（辞書の小字が "字○○" の前半だけに一致した場合もこちらを優先する）
+            // 3. 「字」で始まる辞書の小字（直後が建物名等でも採用する）
+            (string Koaza, string AfterKoaza, string Street, string Block, string Tail)? accepted = null;
+            if (dictionaryMatch.Koaza is not null) {
+                var rest = afterTown[dictionaryMatch.ConsumedLength..];
+                var (s, b, t) = SplitStreetBlock(rest, chomeEntries);
+                if (rest.Length == 0 || !string.IsNullOrEmpty(s) || !string.IsNullOrEmpty(b)) {
+                    accepted = (dictionaryMatch.Koaza, rest, s, b, t);
+                }
+            }
+            if (accepted is null && explicitMatch.Success) {
+                var rest = afterTown[explicitMatch.Length..];
+                var (s, b, t) = SplitStreetBlock(rest, chomeEntries);
+                accepted = (explicitMatch.Value, rest, s, b, t);
+            }
+            if (accepted is null && dictionaryMatch.Koaza is not null && afterTown.StartsWith('字')) {
+                var rest = afterTown[dictionaryMatch.ConsumedLength..];
+                accepted = (dictionaryMatch.Koaza, rest, string.Empty, string.Empty, rest);
+            }
+
+            if (accepted is { } a) {
+                (koaza, afterKoaza, street, block, tail) = a;
+                this._logger.LogDebug("小字 {Koaza} を読み取りました", koaza);
+            }
+        }
+
         return new AddressParseResult {
             Prefecture = prefecture,
             City = city,
             Corrected = corrected,
             Offset = offset,
             Town = town,
+            Koaza = koaza,
             Street = string.IsNullOrEmpty(street) ? null : street,
             Block = string.IsNullOrEmpty(block) ? null : block,
-            Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterTown : tail,
+            Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterKoaza : tail,
         };
     }
 
@@ -500,6 +543,30 @@ internal sealed class AddressService(
                 0;
             if (consumed > bestConsumed) {
                 (best, bestConsumed) = (t, consumed);
+            }
+        }
+        return (best, bestConsumed);
+    }
+
+    /// <summary>
+    /// input の先頭に一致する小字を探す。辞書の小字（koazaNames）と「字」の有無を問わず照合し、
+    /// 入力から消費する文字数が最長のものを選ぶ（例: 入力 "大地内" ↔ 辞書 "字大地内"、入力 "字中島" ↔ 辞書 "中島"）。
+    /// 戻り値の Koaza は辞書の表記、ConsumedLength は入力から消費した文字数。
+    /// </summary>
+    private static (string? Koaza, int ConsumedLength) FindKoaza(
+        string input, IReadOnlyList<string> koazaNames, Func<string, string> normalize) {
+
+        string? best = null;
+        var bestConsumed = 0;
+        foreach (var name in koazaNames.OrderByDescending(n => n.Length)) {
+            var normalizedName = normalize(name);
+            var consumed =
+                input.StartsWith(normalizedName) ? normalizedName.Length :
+                normalizedName.Length > 1 && normalizedName.StartsWith('字') && input.StartsWith(normalizedName[1..]) ? normalizedName.Length - 1 :
+                !normalizedName.StartsWith('字') && input.StartsWith("字" + normalizedName) ? normalizedName.Length + 1 :
+                0;
+            if (consumed > bestConsumed) {
+                (best, bestConsumed) = (name, consumed);
             }
         }
         return (best, bestConsumed);

@@ -95,7 +95,7 @@ public sealed class ParseEndpointTests(ApiTestFixture fixture)
         var content = await response.Content.ReadAsStringAsync();
         var headerLine = content.Split('\n')[0];
         Assert.Equal(
-            "address\tprefecture\tcity\tcounty\ttown\tstreet\tblock\tremainder\tcorrected\toffset",
+            "address\tprefecture\tcity\tcounty\ttown\tkoaza\tstreet\tblock\tremainder\tcorrected\toffset",
             headerLine);
     }
 
