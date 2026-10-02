@@ -109,12 +109,17 @@ public sealed class AddressServiceFixture : IDisposable {
             """);
 
         // 奈良県/吉野郡吉野町.json — 丁目なし地区
+        // 大字本城/本城/本城東 は北九州市八幡西区の町字構成を模したテスト用データ（大字付き町字と、それを接頭辞に持つ町字の識別用）
         File.WriteAllText(Path.Combine(dataDir, "ja", "奈良県", "吉野郡吉野町.json"), """
             {
               "meta": { "updated": 20240101 },
               "data": [
                 { "oaza_cho": "大字吉野山", "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8590, 34.3653] },
-                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8620, 34.4010] }
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8620, 34.4010] },
+                { "oaza_cho": "大字本城",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8600, 34.3700] },
+                { "oaza_cho": "本城",       "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.8601, 34.3701] },
+                { "oaza_cho": "本城東",     "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.8602, 34.3702] },
+                { "oaza_cho": "本城東",     "chome": "二丁目", "chome_n": 2, "koaza": null, "rsdt": true, "point": [135.8603, 34.3703] }
               ]
             }
             """);

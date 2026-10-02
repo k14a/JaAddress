@@ -486,18 +486,23 @@ internal sealed class AddressService(
     private static (Town? Town, int ConsumedLength) FindTown(
         string remainder, IReadOnlyList<Town> towns, bool normalizeOaza, Func<string, string> fold) {
 
-        // 名前が長い順に検索（長い名前を優先して誤検知を防ぐ）
+        // 入力から消費する文字数が最長の町字を選ぶ（長い名前を優先して誤検知を防ぐ）。
+        // 「大字」を外した一致は消費文字数が Name.Length - 2 になるため、Name.Length の順に調べて最初の一致を返すと
+        // 「大字本城」（消費2文字）が「本城東」（消費3文字）より先に一致してしまう。消費文字数で比較する。
+        // 消費文字数が同じ場合は従来どおり Name.Length の長い方（先に調べた方）を優先する。
+        Town? best = null;
+        var bestConsumed = 0;
         foreach (var t in towns.OrderByDescending(t => t.Name.Length)) {
             var foldedName = fold(t.Name);
-            if (remainder.StartsWith(foldedName)) {
-                return (t, t.Name.Length);
-            }
-            if (normalizeOaza && foldedName.Length > 2 && foldedName.StartsWith("大字")
-                && remainder.StartsWith(foldedName[2..])) {
-                return (t, t.Name.Length - 2);
+            var consumed =
+                remainder.StartsWith(foldedName) ? t.Name.Length :
+                normalizeOaza && foldedName.Length > 2 && foldedName.StartsWith("大字") && remainder.StartsWith(foldedName[2..]) ? t.Name.Length - 2 :
+                0;
+            if (consumed > bestConsumed) {
+                (best, bestConsumed) = (t, consumed);
             }
         }
-        return (null, 0);
+        return (best, bestConsumed);
     }
 
     /// <summary>
@@ -520,12 +525,14 @@ internal sealed class AddressService(
         } else if (chomeEntries.Any(e => e.ChomeN is not null)) {
             // 丁目省略形（丁目あり地区のみ）: "3-..." → 入力の半角数字 + "丁目" に変換
             // chomeEntry.Chome（漢字形）ではなく入力数字を使うことで出力形式を統一する
+            // 該当する丁目番号が辞書にない場合は丁目とみなさず、先頭の数字も番地として残す
+            // （例: 一丁目しかない「都町」の "13-9" は 13丁目ではなく番地 "13-9"）
             var bareChomeMatch = Regex.Match(input, @"^([0-9]+)[-－−ー](.*)$");
             if (bareChomeMatch.Success && int.TryParse(bareChomeMatch.Groups[1].Value, out var chomeN)) {
                 if (chomeEntries.Any(e => e.ChomeN == chomeN)) {
                     street = bareChomeMatch.Groups[1].Value + "丁目";
+                    afterStreet = bareChomeMatch.Groups[2].Value;
                 }
-                afterStreet = bareChomeMatch.Groups[2].Value;
             } else {
                 // 漢字丁目形（"一丁目..."）: chomeEntries.Chome と前方一致して "N丁目" に変換
                 var kanjiEntry = chomeEntries
