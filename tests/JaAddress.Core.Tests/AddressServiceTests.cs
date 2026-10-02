@@ -405,6 +405,64 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Equal("123", result.Block);
     }
 
+    // -------------------------------------------------------
+    // ParseAsync - 小字
+    // -------------------------------------------------------
+    [Theory]
+    // 辞書の小字と一致（他の小字「字大地」より長く一致する「字大地内」を選ぶ）
+    [InlineData("奈良県吉野郡吉野町大字六田字大地内95-5", "字大地内", "95-5", "")]
+    // 入力が「字」を省略、辞書は「字」付き
+    [InlineData("奈良県吉野郡吉野町大字六田大地内95-5", "字大地内", "95-5", "")]
+    // 入力が「字」付き、辞書は「字」なし
+    [InlineData("奈良県吉野郡吉野町大字六田字中島12", "中島", "12", "")]
+    // 「字」の付かない小字
+    [InlineData("奈良県吉野郡吉野町六田中島12-3ハイツ101", "中島", "12-3", "ハイツ101")]
+    // 全角数字・ハイフン
+    [InlineData("奈良県吉野郡吉野町大字六田字大地内９５－５", "字大地内", "95-5", "")]
+    // 辞書にない「字○○」は入力の表記
+    [InlineData("奈良県吉野郡吉野町大字六田字新田7-8", "字新田", "7-8", "")]
+    // 辞書の小字「字東」が前半だけに一致する場合は、辞書にない「字東山」として読む
+    [InlineData("奈良県吉野郡吉野町大字六田字東山5", "字東山", "5", "")]
+    // 「字」で始まる辞書の小字は、番地がなくても読み取る
+    [InlineData("奈良県吉野郡吉野町大字六田字宮前ハイツ", "字宮前", null, "ハイツ")]
+    [InlineData("奈良県吉野郡吉野町大字六田字大地内", "字大地内", null, "")]
+    public async Task ParseAsync_小字のあとの番地を取得し小字をKoazaに返す(
+        string address, string expectedKoaza, string? expectedBlock, string expectedRemainder) {
+
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字六田", result.Town?.Name);
+        Assert.Equal(expectedKoaza, result.Koaza);
+        Assert.Null(result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+        Assert.Equal(expectedRemainder, result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_字の付かない小字のあとに番地がなければ小字とみなさない() {
+        // 「中島」は辞書の小字だが、建物名等の先頭と区別できないため読み取らない
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町大字六田中島ハイツ", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("大字六田", result.Town?.Name);
+        Assert.Null(result.Koaza);
+        Assert.Null(result.Block);
+        Assert.Equal("中島ハイツ", result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_町字の直後が番地なら小字を読み取らない() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町大字六田12-3", options);
+
+        Assert.NotNull(result);
+        Assert.Null(result.Koaza);
+        Assert.Equal("12-3", result.Block);
+    }
+
     [Fact]
     public async Task ParseAsync_郡省略_CorrectedがTrueで郡名が補完される() {
         var result = await this._sut.ParseAsync("奈良県吉野町大字吉野山");
