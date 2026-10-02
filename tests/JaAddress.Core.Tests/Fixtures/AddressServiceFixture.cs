@@ -110,12 +110,18 @@ public sealed class AddressServiceFixture : IDisposable {
 
         // 奈良県/吉野郡吉野町.json — 丁目なし地区
         // 大字本城/本城/本城東 は北九州市八幡西区の町字構成を模したテスト用データ（大字付き町字と、それを接頭辞に持つ町字の識別用）
+        // 大字六田の小字は伊達市保原町大泉等の構成を模したテスト用データ（「字」付き・「字」なしの小字、他の小字の前半に一致する小字）
         File.WriteAllText(Path.Combine(dataDir, "ja", "奈良県", "吉野郡吉野町.json"), """
             {
               "meta": { "updated": 20240101 },
               "data": [
                 { "oaza_cho": "大字吉野山", "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8590, 34.3653] },
                 { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8620, 34.4010] },
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": "字大地内", "rsdt": false, "point": null },
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": "字大地",   "rsdt": false, "point": null },
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": "字宮前",   "rsdt": false, "point": null },
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": "字東",     "rsdt": false, "point": null },
+                { "oaza_cho": "大字六田",   "chome": null, "chome_n": null, "koaza": "中島",     "rsdt": false, "point": null },
                 { "oaza_cho": "大字本城",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8600, 34.3700] },
                 { "oaza_cho": "本城",       "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.8601, 34.3701] },
                 { "oaza_cho": "本城東",     "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.8602, 34.3702] },

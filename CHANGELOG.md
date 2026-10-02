@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `foldItaiji` パラメータ、`POST /parse` の `foldItaiji` フィールドを追加。
 - `JaAddress.Integration.Tests`：リポジトリ直下の `data/`（DataBuilder 生成の本番相当データ）を
   そのまま読み込む結合テストを追加。`data/` が無い環境ではスキップされる。
+- `AddressParseResult.Koaza`：`SplitRemainder=true` で町字のあとに小字があれば読み取り、その後ろを丁目・番地として分割する
+  （例：`保原町大泉字大地内95-5` → Town「保原町大泉」、Koaza「字大地内」、Block「95-5」。従来は小字と番地を Remainder に残していた）。
+  辞書の小字と「字」の有無を問わず照合する。API の `/parse` 応答と TSV 出力に `koaza` を追加。
 
 ### Security
 

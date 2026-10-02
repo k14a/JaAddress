@@ -5,7 +5,7 @@ namespace JaAddress.Api.Services;
 
 internal sealed class TsvService {
     private static readonly string[] Headers =
-        ["address", "prefecture", "city", "county", "town", "street", "block", "remainder", "corrected", "offset"];
+        ["address", "prefecture", "city", "county", "town", "koaza", "street", "block", "remainder", "corrected", "offset"];
 
     public static string BuildTemplate() =>
         string.Join('\t', Headers) + "\n";
@@ -52,6 +52,7 @@ internal sealed class TsvService {
                 r.City       ?? string.Empty,
                 r.County     ?? string.Empty,
                 r.Town       ?? string.Empty,
+                r.Koaza      ?? string.Empty,
                 r.Street     ?? string.Empty,
                 r.Block      ?? string.Empty,
                 r.Remainder  ?? string.Empty,
