@@ -138,4 +138,21 @@ public sealed class RealDataParseTests(RealDataFixture fixture) : IClassFixture<
         Assert.Equal("1丁目", result.Street);
         Assert.Equal("1-9", result.Block);
     }
+
+    // -------------------------------------------------------
+    // ParseAsync（小字）
+    // -------------------------------------------------------
+    [SkippableTheory]
+    [InlineData("福島県伊達市保原町大泉字大地内95-5")]
+    // 入力が「字」を省略
+    [InlineData("福島県伊達市保原町大泉大地内95-5")]
+    public async Task ParseAsync_小字のあとの番地まで取れる(string address) {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this.Sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("保原町大泉", result.Town?.Name);
+        Assert.Equal("字大地内", result.Koaza);
+        Assert.Equal("95-5", result.Block);
+    }
 }

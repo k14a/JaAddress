@@ -13,6 +13,7 @@ internal static class ParseDtoMapper {
                 City       = result.City.DisplayName,
                 County     = result.City.County,
                 Town       = result.Town?.Name,
+                Koaza      = result.Koaza,
                 Street     = result.Street,
                 Block      = result.Block,
                 Remainder  = result.Remainder,
