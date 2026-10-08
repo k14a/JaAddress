@@ -111,6 +111,9 @@ public sealed class AddressServiceFixture : IDisposable {
         // 奈良県/吉野郡吉野町.json — 丁目なし地区
         // 大字本城/本城/本城東 は北九州市八幡西区の町字構成を模したテスト用データ（大字付き町字と、それを接頭辞に持つ町字の識別用）
         // 大字六田の小字は伊達市保原町大泉等の構成を模したテスト用データ（「字」付き・「字」なしの小字、他の小字の前半に一致する小字）
+        // 美園二条・北一条西・古町通五番町は札幌市・新潟市の漢数字の町字、平和通の小字は札幌市白石区の "十一丁目北"、
+        // 村崎野の小字は岩手県北上市の地割（全角数字）、北崎町は丁目と小字の両方を持つ愛知県大府市の町字、来迎寺は地番の冠称（甲）の町字、
+        // 蔵前町・蔵前町二丁は丁目のある町字と "N丁" で終わる町字が並ぶ堺市の町字を模したテスト用データ
         File.WriteAllText(Path.Combine(dataDir, "ja", "奈良県", "吉野郡吉野町.json"), """
             {
               "meta": { "updated": 20240101 },
@@ -125,7 +128,22 @@ public sealed class AddressServiceFixture : IDisposable {
                 { "oaza_cho": "大字本城",   "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": [135.8600, 34.3700] },
                 { "oaza_cho": "本城",       "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.8601, 34.3701] },
                 { "oaza_cho": "本城東",     "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": [135.8602, 34.3702] },
-                { "oaza_cho": "本城東",     "chome": "二丁目", "chome_n": 2, "koaza": null, "rsdt": true, "point": [135.8603, 34.3703] }
+                { "oaza_cho": "本城東",     "chome": "二丁目", "chome_n": 2, "koaza": null, "rsdt": true, "point": [135.8603, 34.3703] },
+                { "oaza_cho": "美園二条",   "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": null },
+                { "oaza_cho": "北一条西",   "chome": "二丁目", "chome_n": 2, "koaza": null, "rsdt": true, "point": null },
+                { "oaza_cho": "古町通五番町", "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": null },
+                { "oaza_cho": "平和通",     "chome": null, "chome_n": null, "koaza": "十一丁目北", "rsdt": false, "point": null },
+                { "oaza_cho": "平和通",     "chome": null, "chome_n": null, "koaza": "十一丁目南", "rsdt": false, "point": null },
+                { "oaza_cho": "村崎野",     "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": null },
+                { "oaza_cho": "村崎野",     "chome": null, "chome_n": null, "koaza": "１地割",  "rsdt": false, "point": null },
+                { "oaza_cho": "村崎野",     "chome": null, "chome_n": null, "koaza": "１４地割", "rsdt": false, "point": null },
+                { "oaza_cho": "北崎町",     "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": null },
+                { "oaza_cho": "北崎町",     "chome": "一丁目", "chome_n": 1, "koaza": null, "rsdt": true, "point": null },
+                { "oaza_cho": "北崎町",     "chome": null, "chome_n": null, "koaza": "井田", "rsdt": false, "point": null },
+                { "oaza_cho": "来迎寺",     "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": null },
+                { "oaza_cho": "来迎寺",     "chome": null, "chome_n": null, "koaza": "八反田", "rsdt": false, "point": null },
+                { "oaza_cho": "蔵前町",     "chome": "二丁目", "chome_n": 2, "koaza": null, "rsdt": true, "point": null },
+                { "oaza_cho": "蔵前町二丁", "chome": null, "chome_n": null, "koaza": null, "rsdt": false, "point": null }
               ]
             }
             """);

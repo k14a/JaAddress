@@ -440,6 +440,93 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         Assert.Equal(expectedRemainder, result.Remainder);
     }
 
+    // -------------------------------------------------------
+    // ParseAsync - 町字名・小字名の数字の表記
+    // -------------------------------------------------------
+    [Theory]
+    // 辞書は漢数字、入力は算用数字（全角は NormalizeNumber で半角になる）
+    [InlineData("奈良県吉野郡吉野町美園2条1丁目2", "美園二条", "1丁目", "2")]
+    [InlineData("奈良県吉野郡吉野町美園２条１丁目２", "美園二条", "1丁目", "2")]
+    [InlineData("奈良県吉野郡吉野町北1条西2丁目3", "北一条西", "2丁目", "3")]
+    [InlineData("奈良県吉野郡吉野町古町通5番町615", "古町通五番町", null, "615")]
+    // 辞書どおりの漢数字の入力も従来どおり一致する
+    [InlineData("奈良県吉野郡吉野町美園二条1丁目2", "美園二条", "1丁目", "2")]
+    // "N丁" で終わる町字（蔵前町二丁）は "丁目" の途中まで一致させない
+    [InlineData("奈良県吉野郡吉野町蔵前町2丁目8-5", "蔵前町", "2丁目", "8-5")]
+    [InlineData("奈良県吉野郡吉野町蔵前町2丁8-5", "蔵前町二丁", null, "8-5")]
+    public async Task ParseAsync_町字名の漢数字を算用数字で書いた入力も一致する(
+        string address, string expectedTown, string? expectedStreet, string expectedBlock) {
+
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal(expectedTown, result.Town?.Name);
+        Assert.Equal(expectedStreet, result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+    }
+
+    [Theory]
+    // 札幌の "十一丁目北"：丁目 "11丁目"＋番地なしではなく、小字として読み番地を取る
+    [InlineData("奈良県吉野郡吉野町平和通11丁目北6-19", "平和通", "十一丁目北", "6-19")]
+    [InlineData("奈良県吉野郡吉野町平和通十一丁目南5-5", "平和通", "十一丁目南", "5-5")]
+    // 岩手の地割（辞書は全角数字）：地割の数字を番地として読まない。"１地割" より長く一致する "１４地割" を選ぶ
+    [InlineData("奈良県吉野郡吉野町村崎野14地割453-5", "村崎野", "１４地割", "453-5")]
+    [InlineData("奈良県吉野郡吉野町村崎野1地割5", "村崎野", "１地割", "5")]
+    public async Task ParseAsync_数字を含む辞書の小字は丁目番地より優先して読む(
+        string address, string expectedTown, string expectedKoaza, string expectedBlock) {
+
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal(expectedTown, result.Town?.Name);
+        Assert.Equal(expectedKoaza, result.Koaza);
+        Assert.Null(result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+    }
+
+    [Fact]
+    public async Task ParseAsync_数字を含む小字でも直後に番地が続かなければ小字とみなさない() {
+        // 辞書の小字「八反田」が「八反田町1」の前半だけに一致する場合は読み取らない
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町来迎寺八反田町1", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("来迎寺", result.Town?.Name);
+        Assert.Null(result.Koaza);
+        Assert.Equal("八反田町1", result.Remainder);
+    }
+
+    [Fact]
+    public async Task ParseAsync_地番の冠称を小字として読み番地を取る() {
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync("奈良県吉野郡吉野町来迎寺甲2621-4", options);
+
+        Assert.NotNull(result);
+        Assert.Equal("来迎寺", result.Town?.Name);
+        Assert.Equal("甲", result.Koaza);
+        Assert.Equal("2621-4", result.Block);
+    }
+
+    [Theory]
+    // 小字のあとの "1-1" は丁目省略形として読まない（小字のある地域に丁目はない）
+    [InlineData("奈良県吉野郡吉野町北崎町井田1-1", "井田", null, "1-1")]
+    // 小字がなければ従来どおり丁目省略形として読む
+    [InlineData("奈良県吉野郡吉野町北崎町1-1", null, "1丁目", "1")]
+    public async Task ParseAsync_小字のあとの番地は丁目省略形として読まない(
+        string address, string? expectedKoaza, string? expectedStreet, string expectedBlock) {
+
+        var options = new AddressParseOptions { SplitRemainder = true, NormalizeOaza = true };
+        var result = await this._sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal("北崎町", result.Town?.Name);
+        Assert.Equal(expectedKoaza, result.Koaza);
+        Assert.Equal(expectedStreet, result.Street);
+        Assert.Equal(expectedBlock, result.Block);
+    }
+
     [Fact]
     public async Task ParseAsync_字の付かない小字のあとに番地がなければ小字とみなさない() {
         // 「中島」は辞書の小字だが、建物名等の先頭と区別できないため読み取らない

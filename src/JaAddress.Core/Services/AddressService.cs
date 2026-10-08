@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace JaAddress.Core.Services;
 
-internal sealed class AddressService(
+internal sealed partial class AddressService(
     JaAddressOptions options,
     IItaijiFolder itaijiFolder,
     ILogger<AddressService> logger) : IAddressService {
@@ -310,36 +310,54 @@ internal sealed class AddressService(
         var chomeEntries = rawEntries.Where(e => e.OazaCho == town.Name).ToList();
         var (street, block, tail) = SplitStreetBlock(afterTown, chomeEntries);
 
-        // 丁目・番地が取れなかった場合、町字のあとに小字（"字大地内95-5" 等）があれば読み取り、その後ろを丁目・番地として分割する
+        // 町字のあとに小字（"字大地内95-5" 等）があれば読み取り、その後ろを丁目・番地として分割する。
+        // 小字のある地域に丁目はないため、小字の後ろは丁目省略形（"1-3" → 1丁目3）・漢字丁目形として解釈しない（明示的な "N丁目" のみ丁目とする）
         string? koaza = null;
         var afterKoaza = afterTown;
-        if (string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block)) {
-            var normalize = options.NormalizeNumber ? NormalizeNumber : Identity;
-            var koazaNames = chomeEntries
-                .Where(e => !string.IsNullOrEmpty(e.Koaza))
-                .Select(e => e.Koaza!)
-                .Distinct()
-                .ToList();
-            var dictionaryMatch = FindKoaza(afterTown, koazaNames, s => fold(normalize(s)));
+        var normalize = options.NormalizeNumber ? NormalizeNumber : Identity;
+        var koazaNames = chomeEntries
+            .Where(e => !string.IsNullOrEmpty(e.Koaza))
+            .Select(e => e.Koaza!)
+            .Distinct()
+            .ToList();
+        var dictionaryMatch = koazaNames.Count > 0 ? FindKoaza(afterTown, koazaNames, s => fold(normalize(s))) : (null, 0);
+
+        // 数字を含む辞書の小字（札幌の "十一丁目北"、岩手の "１４地割" 等）は、丁目・番地として読むより優先する
+        // （"11丁目北6-19" を 丁目 "11丁目"＋番地なし、"14地割453-5" を 番地 "14" と読まないようにする）。
+        // ただし直後に丁目・番地が続くか住所がそこで終わる場合に限る（"八反田町1" を小字 "八反田"＋"町1" と読まないようにする）
+        var preferNumberedKoaza = false;
+        if (dictionaryMatch.Koaza is not null && ContainsNumeral(dictionaryMatch.Koaza)) {
+            var rest = afterTown[dictionaryMatch.ConsumedLength..];
+            var (s, b, _) = SplitStreetBlock(rest, NoChomeEntries);
+            preferNumberedKoaza = rest.Length == 0 || !string.IsNullOrEmpty(s) || !string.IsNullOrEmpty(b);
+        }
+        if (preferNumberedKoaza || (string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block))) {
             var explicitMatch = Regex.Match(afterTown, @"^字[^0-9\-\s　]+?(?=[0-9])");
+            var prefixMatch = Regex.Match(afterTown, "^[甲乙丙丁戊己庚辛壬癸](?=[0-9])");
 
             // 採用順：
-            // 1. 辞書の小字で、直後に丁目・番地が続くか住所がそこで終わるもの
+            // 1. 辞書の小字で、直後に丁目・番地が続くか住所がそこで終わるもの（数字を含む小字は常に）
             //    （「字」の付かない小字は建物名等の先頭と偶然一致しうるため、この条件を満たす場合のみ採用する）
             // 2. 辞書にない "字○○" で、直後に数字が続くもの（辞書の小字が "字○○" の前半だけに一致した場合もこちらを優先する）
-            // 3. 「字」で始まる辞書の小字（直後が建物名等でも採用する）
+            // 3. 地番の冠称（"甲680"・"庚154-2" の甲・庚 等）で、直後に数字が続くもの
+            // 4. 「字」で始まる辞書の小字（直後が建物名等でも採用する）
             (string Koaza, string AfterKoaza, string Street, string Block, string Tail)? accepted = null;
             if (dictionaryMatch.Koaza is not null) {
                 var rest = afterTown[dictionaryMatch.ConsumedLength..];
-                var (s, b, t) = SplitStreetBlock(rest, chomeEntries);
-                if (rest.Length == 0 || !string.IsNullOrEmpty(s) || !string.IsNullOrEmpty(b)) {
+                var (s, b, t) = SplitStreetBlock(rest, NoChomeEntries);
+                if (preferNumberedKoaza || rest.Length == 0 || !string.IsNullOrEmpty(s) || !string.IsNullOrEmpty(b)) {
                     accepted = (dictionaryMatch.Koaza, rest, s, b, t);
                 }
             }
             if (accepted is null && explicitMatch.Success) {
                 var rest = afterTown[explicitMatch.Length..];
-                var (s, b, t) = SplitStreetBlock(rest, chomeEntries);
+                var (s, b, t) = SplitStreetBlock(rest, NoChomeEntries);
                 accepted = (explicitMatch.Value, rest, s, b, t);
+            }
+            if (accepted is null && prefixMatch.Success) {
+                var rest = afterTown[prefixMatch.Length..];
+                var (s, b, t) = SplitStreetBlock(rest, NoChomeEntries);
+                accepted = (prefixMatch.Value, rest, s, b, t);
             }
             if (accepted is null && dictionaryMatch.Koaza is not null && afterTown.StartsWith('字')) {
                 var rest = afterTown[dictionaryMatch.ConsumedLength..];
@@ -533,20 +551,78 @@ internal sealed class AddressService(
         // 「大字」を外した一致は消費文字数が Name.Length - 2 になるため、Name.Length の順に調べて最初の一致を返すと
         // 「大字本城」（消費2文字）が「本城東」（消費3文字）より先に一致してしまう。消費文字数で比較する。
         // 消費文字数が同じ場合は従来どおり Name.Length の長い方（先に調べた方）を優先する。
+        // 辞書の町字名の漢数字・全角数字を算用数字にした表記（"美園二条" → "美園2条"、"古町通五番町" → "古町通5番町"）とも照合する
         Town? best = null;
         var bestConsumed = 0;
         foreach (var t in towns.OrderByDescending(t => t.Name.Length)) {
-            var foldedName = fold(t.Name);
-            var consumed =
-                remainder.StartsWith(foldedName) ? t.Name.Length :
-                normalizeOaza && foldedName.Length > 2 && foldedName.StartsWith("大字") && remainder.StartsWith(foldedName[2..]) ? t.Name.Length - 2 :
-                0;
-            if (consumed > bestConsumed) {
-                (best, bestConsumed) = (t, consumed);
+            foreach (var name in NameVariants(t.Name)) {
+                var foldedName = fold(name);
+                var consumed =
+                    remainder.StartsWith(foldedName) ? name.Length :
+                    normalizeOaza && foldedName.Length > 2 && foldedName.StartsWith("大字") && remainder.StartsWith(foldedName[2..]) ? name.Length - 2 :
+                    0;
+                // "N丁" で終わる町字（堺市の "蔵前町二丁" 等）が "蔵前町2丁目" の "丁目" の途中まで一致した場合は採用しない（町字 "蔵前町"＋2丁目とする）
+                if (consumed > 0 && name.EndsWith('丁') && remainder.Length > consumed && remainder[consumed] == '目') {
+                    consumed = 0;
+                }
+                if (consumed > bestConsumed) {
+                    (best, bestConsumed) = (t, consumed);
+                }
             }
         }
         return (best, bestConsumed);
     }
+
+    private static readonly IReadOnlyList<TownEntry> NoChomeEntries = [];
+
+    private static readonly ConcurrentDictionary<string, string[]> NameVariantCache = new();
+
+    /// <summary>
+    /// 町字名・小字名の照合に使う表記：辞書の表記と、漢数字・全角数字を算用数字にした表記（異なる場合のみ）。
+    /// 名前の末尾の数字は変換しない（"東一" 等を "東1" にすると、入力の "東1-2" の番地の数字を町字名として消費してしまうため）。
+    /// </summary>
+    internal static string[] NameVariants(string name) => NameVariantCache.GetOrAdd(name, static n => {
+        var variant = NumeralRunPattern().Replace(n, m => ParseNumeral(m.Value).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        return variant == n ? [n] : [n, variant];
+    });
+
+    /// <summary>名前が漢数字・数字を含むか（数字を含む小字の判定用）。</summary>
+    private static bool ContainsNumeral(string name) => NumeralPattern().IsMatch(name);
+
+    /// <summary>漢数字（〇一二…九・十百千）または全角・半角数字の並びを数値にする（"十一" → 11、"二〇" → 20、"１４" → 14）。</summary>
+    private static int ParseNumeral(string s) {
+        static int Digit(char c) => c switch {
+            >= '0' and <= '9' => c - '0',
+            >= '０' and <= '９' => c - '０',
+            '〇' => 0, '一' => 1, '二' => 2, '三' => 3, '四' => 4, '五' => 5, '六' => 6, '七' => 7, '八' => 8, '九' => 9,
+            _ => -1,
+        };
+
+        // 単位（十・百・千）を含まなければ位取り（"二〇" → 20）
+        if (s.All(c => Digit(c) >= 0)) {
+            return s.Aggregate(0, (acc, c) => (acc * 10) + Digit(c));
+        }
+
+        var total = 0;
+        var current = 0;
+        foreach (var c in s) {
+            var unit = c switch { '十' => 10, '百' => 100, '千' => 1000, _ => 0 };
+            if (unit > 0) {
+                total += (current == 0 ? 1 : current) * unit;
+                current = 0;
+            } else {
+                current = (current * 10) + Digit(c);
+            }
+        }
+        return total + current;
+    }
+
+    // 末尾以外にある数字の並び（後ろに1文字以上続くもの）
+    [GeneratedRegex("[〇一二三四五六七八九十百千0-9０-９]+(?=.)")]
+    private static partial Regex NumeralRunPattern();
+
+    [GeneratedRegex("[〇一二三四五六七八九十百千0-9０-９]")]
+    private static partial Regex NumeralPattern();
 
     /// <summary>
     /// input の先頭に一致する小字を探す。辞書の小字（koazaNames）と「字」の有無を問わず照合し、
@@ -556,17 +632,20 @@ internal sealed class AddressService(
     private static (string? Koaza, int ConsumedLength) FindKoaza(
         string input, IReadOnlyList<string> koazaNames, Func<string, string> normalize) {
 
+        // 辞書の小字名の漢数字・全角数字を算用数字にした表記（"十一丁目北" → "11丁目北"、"１４地割" → "14地割"）とも照合する
         string? best = null;
         var bestConsumed = 0;
         foreach (var name in koazaNames.OrderByDescending(n => n.Length)) {
-            var normalizedName = normalize(name);
-            var consumed =
-                input.StartsWith(normalizedName) ? normalizedName.Length :
-                normalizedName.Length > 1 && normalizedName.StartsWith('字') && input.StartsWith(normalizedName[1..]) ? normalizedName.Length - 1 :
-                !normalizedName.StartsWith('字') && input.StartsWith("字" + normalizedName) ? normalizedName.Length + 1 :
-                0;
-            if (consumed > bestConsumed) {
-                (best, bestConsumed) = (name, consumed);
+            foreach (var variant in NameVariants(name)) {
+                var normalizedName = normalize(variant);
+                var consumed =
+                    input.StartsWith(normalizedName) ? normalizedName.Length :
+                    normalizedName.Length > 1 && normalizedName.StartsWith('字') && input.StartsWith(normalizedName[1..]) ? normalizedName.Length - 1 :
+                    !normalizedName.StartsWith('字') && input.StartsWith("字" + normalizedName) ? normalizedName.Length + 1 :
+                    0;
+                if (consumed > bestConsumed) {
+                    (best, bestConsumed) = (name, consumed);
+                }
             }
         }
         return (best, bestConsumed);
