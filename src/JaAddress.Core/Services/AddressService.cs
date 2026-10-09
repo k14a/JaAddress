@@ -204,13 +204,31 @@ internal sealed partial class AddressService(
         // 異体字マップは 1 文字 → 1 文字のため、畳み込み後も文字列長は不変（Name.Length で slice して問題ない）
         var afterPref = text[prefecture.Name.Length..];
 
+        // 島名の付いた住所（"八丈島八丈町…"・"三宅島三宅村…"）。辞書（アドレス・ベース・レジストリ）に島名はないが、慣習として町村名の前に島名を書くことが多い。
+        // 島名のあとに町村名が続けば島名を読み飛ばし、町村名がなければ（"八丈島三根…"）島名を町村名に置き換えて補正として扱う
+        var islandCorrected = false;
+        foreach (var (islandPref, island, islandCity) in IslandNames) {
+            if (prefecture.Name != islandPref || !afterPref.StartsWith(fold(island))) {
+                continue;
+            }
+            var afterIsland = afterPref[island.Length..];
+            if (afterIsland.StartsWith(fold(islandCity))) {
+                afterPref = afterIsland;
+            } else {
+                afterPref = fold(islandCity) + afterIsland;
+                islandCorrected = true;
+                this._logger.LogDebug("町村名の省略された島名を補正しました: {Island} → {City}", island, islandCity);
+            }
+            break;
+        }
+
         // 市区町村を特定
         var cities = await this.GetCitiesAsync(prefecture.Name, ct);
         var city = cities
             .OrderByDescending(c => c.DisplayName.Length)
             .FirstOrDefault(c => afterPref.StartsWith(fold(c.DisplayName)));
 
-        var corrected = false;
+        var corrected = islandCorrected;
         Town? correctedTown = null;
 
         // 補正1: ward省略 "北区…" → ward 単体でマッチして親 city を補完
@@ -382,6 +400,16 @@ internal sealed partial class AddressService(
             Remainder = string.IsNullOrEmpty(street) && string.IsNullOrEmpty(block) ? afterKoaza : tail,
         };
     }
+
+    /// <summary>
+    /// 慣習として町村名の前に書かれる島名（都道府県, 島名, 町村名）。辞書（アドレス・ベース・レジストリ）には島名がない。
+    /// 町村名が島名を含まないものだけを持つ（利島村・新島村・神津島村・御蔵島村・青ヶ島村・大島町は町村名に島名を含み、
+    /// 小笠原村の父島・母島は町字として辞書にある）。
+    /// </summary>
+    private static readonly (string Prefecture, string Island, string City)[] IslandNames = [
+        ("東京都", "八丈島", "八丈町"),
+        ("東京都", "三宅島", "三宅村"),
+    ];
 
     /// <summary>解析結果の情報量（大きいほど詳細）。BestEffort の候補選択に使う。</summary>
     private const int MaxCompletenessScore = 3;
