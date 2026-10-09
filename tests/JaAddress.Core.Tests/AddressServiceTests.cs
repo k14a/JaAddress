@@ -280,7 +280,7 @@ public sealed class AddressServiceTests(AddressServiceFixture fixture)
         // 先頭側は町字が取れず、後続の完全な住所を採用する。
         var options = new AddressParseOptions { BestEffort = true, SplitRemainder = true };
         var result = await this._sut.ParseAsync(
-            "ハーベスト株式会社(東京都千代田区内の社員食堂) 東京都新宿区西新宿1-2-3 地図を見る", options);
+            "株式会社サンプル(東京都千代田区内の社員食堂) 東京都新宿区西新宿1-2-3 地図を見る", options);
 
         Assert.NotNull(result);
         Assert.Equal("東京都", result.Prefecture.Name);

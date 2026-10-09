@@ -6,8 +6,8 @@
 
 ### 背景
 
-呼び出し側（RivalDataCsFileCheck.IndeedPlus）で 172 万件規模の CSV を処理した際、
-WorkLocation 住所正規化ありで **5224 秒**かかった（WorkLocation なし 195 万件では 1671 秒）。
+呼び出し側で 172 万件規模の CSV を処理した際、
+住所の正規化ありで **5224 秒**かかった（住所の正規化なし 195 万件では 1671 秒）。
 
 `ParseAsync` は 1 件ごとに `GetCitiesAsync` を呼ぶ（`AddressService.cs:143`）。  
 `GetCitiesAsync`（57〜79 行目）は `ja.json`（約 188 KB、47 都道府県・1898 市区町村）を  
