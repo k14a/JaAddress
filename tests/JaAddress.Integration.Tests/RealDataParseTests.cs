@@ -155,4 +155,22 @@ public sealed class RealDataParseTests(RealDataFixture fixture) : IClassFixture<
         Assert.Equal("字大地内", result.Koaza);
         Assert.Equal("95-5", result.Block);
     }
+
+    // -------------------------------------------------------
+    // ParseAsync（島名）
+    // -------------------------------------------------------
+    [SkippableTheory]
+    [InlineData("東京都八丈島八丈町三根1-2", "八丈町", "三根", false)]
+    [InlineData("東京都三宅島三宅村坪田1-2", "三宅村", "坪田", false)]
+    [InlineData("東京都八丈島大賀郷1-2", "八丈町", "大賀郷", true)]
+    public async Task ParseAsync_島名入りの住所の町村が取れる(string address, string expectedCity, string expectedTown, bool expectedCorrected) {
+        var options = new AddressParseOptions { SplitRemainder = true };
+        var result = await this.Sut.ParseAsync(address, options);
+
+        Assert.NotNull(result);
+        Assert.Equal(expectedCity, result.City.Name);
+        Assert.Equal(expectedTown, result.Town?.Name);
+        Assert.Equal("1-2", result.Block);
+        Assert.Equal(expectedCorrected, result.Corrected);
+    }
 }
