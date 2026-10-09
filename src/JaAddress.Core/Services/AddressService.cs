@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -130,13 +131,12 @@ internal sealed partial class AddressService(
         options ??= new AddressParseOptions();
         var input = options.NormalizeNumber ? NormalizeNumber(address) : address;
 
-        // 異体字（旧字体）の畳み込み。入力と辞書名称の双方に同じマップを適用する。
-        // 1 文字 → 1 文字の置換なので、以降のオフセット計算（*.Length による slice）は影響を受けない。
+        // 異体字（旧字体）の畳み込みと、小書きのヶ・ヵ・ゖ をケに畳み込む表記揺れの吸収（常に有効）。入力と辞書名称の双方に同じ変換を適用する。
+        // 辞書は名前ごとにヶ・ケが混在する（"古ケ場"・"三ヶ尻"、"茅ヶ崎市"・"鎌ケ谷市"）ため、入力の表記と一致しないと町字・市区町村が取れない。
+        // いずれも 1 文字 → 1 文字の置換なので、以降のオフセット計算（*.Length による slice）は影響を受けない。
         var foldItaiji = this._itaijiFolder.Enabled && (options.FoldItaiji ?? true);
-        var fold = foldItaiji ? this._itaijiFolder.Fold : Identity;
-        if (foldItaiji) {
-            input = this._itaijiFolder.Fold(input);
-        }
+        Func<string, string> fold = foldItaiji ? s => FoldSmallKe(this._itaijiFolder.Fold(s)) : FoldSmallKe;
+        input = fold(input);
 
         // 都道府県を特定
         var prefectures = await this.GetPrefecturesAsync(ct);
@@ -306,8 +306,13 @@ internal sealed partial class AddressService(
         }
 
         // 丁目名をデータから引くために生エントリを使う（GetTownsAsync 内でキャッシュ済み）
+        // 辞書に同じ町字がヶ・ケ違い等の表記で重複している（"野向町牛ヶ谷"・"野向町牛ケ谷"）場合、畳み込みで一致した町字はどちらか一方になるため、
+        // 畳み込み後の名前が同じエントリの丁目・小字をまとめて使う（畳み込みは長さを変えないため、長さが同じものだけ畳み込んで比べる）
         var rawEntries = await this.LoadTownEntriesAsync(prefecture.Name, city.Name, ct);
-        var chomeEntries = rawEntries.Where(e => e.OazaCho == town.Name).ToList();
+        var chomeEntries = rawEntries
+            .Where(e => e.OazaCho is not null && e.OazaCho.Length == town.Name.Length
+                && (e.OazaCho == town.Name || fold(e.OazaCho) == foldedTownName))
+            .ToList();
         var (street, block, tail) = SplitStreetBlock(afterTown, chomeEntries);
 
         // 町字のあとに小字（"字大地内95-5" 等）があれば読み取り、その後ろを丁目・番地として分割する。
@@ -446,6 +451,20 @@ internal sealed partial class AddressService(
 
         return occurrences.OrderBy(o => o.Offset).ToList();
     }
+
+    /// <summary>小書きのヶ・ヵ（片仮名）・ゖ（平仮名）をケに畳み込む（"古ヶ場" → "古ケ場"）。1 文字 → 1 文字の置換。</summary>
+    private static string FoldSmallKe(string value) {
+        if (value.AsSpan().IndexOfAny(SmallKe) < 0) {
+            return value;
+        }
+        return string.Create(value.Length, value, static (span, src) => {
+            for (var i = 0; i < src.Length; i++) {
+                span[i] = SmallKe.Contains(src[i]) ? 'ケ' : src[i];
+            }
+        });
+    }
+
+    private static readonly SearchValues<char> SmallKe = SearchValues.Create("ヶヵゖ");
 
     /// <summary>全角数字・ハイフン類を半角に正規化する。</summary>
     private static string NormalizeNumber(string input) {
