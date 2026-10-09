@@ -156,7 +156,7 @@ internal sealed partial class AddressService(
         // BestEffort: テキスト中に出現するすべての都道府県名の位置を候補として解析し、
         // 最も情報量の多い（町字・番地まで取れた）結果を採用する。
         // 会社名などノイズに紛れた都道府県名を先に掴んで解析失敗するケースを避けるため。
-        // 例: "ハーベスト株式会社(東京都中央区内の社員食堂) 東京都中央区日本橋本石町1-1-9"
+        // 例: "株式会社サンプル(東京都中央区内の社員食堂) 東京都中央区日本橋本石町1-2-3"
         var occurrences = FindAllPrefectureOccurrences(input, prefectures, fold);
         if (occurrences.Count == 0) {
             this._logger.LogDebug("都道府県を特定できませんでした: {Address}", address);

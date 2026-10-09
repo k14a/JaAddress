@@ -105,10 +105,10 @@ public sealed class RealDataParseTests(RealDataFixture fixture) : IClassFixture<
     // ParseAsync（勤務地テキストの表記ゆれ: 町名重複・都道府県の複数出現）
     // -------------------------------------------------------
     [SkippableTheory]
-    [InlineData("⻄⿇布　りんどう 106-0031東京都港区西麻布西麻布１丁目１１番１３号 地図を見る",
-        "港区", "西麻布", "1丁目", "11-13")]
-    [InlineData("株式会社バディデータ 101-0047東京都千代田区内神田内神田２丁目１３番８号ＢＭビル２階 地図を見る",
-        "千代田区", "内神田", "2丁目", "13-8")]
+    [InlineData("⻄⿇布　サンプル 106-0031東京都港区西麻布西麻布１丁目２番３号 地図を見る",
+        "港区", "西麻布", "1丁目", "2-3")]
+    [InlineData("株式会社サンプル 101-0047東京都千代田区内神田内神田２丁目１番２号サンプルビル２階 地図を見る",
+        "千代田区", "内神田", "2丁目", "1-2")]
     public async Task ParseAsync_BestEffort_町名が連続重複_重複を読み飛ばして番地まで取れる(
         string address, string expectedCity, string expectedTown, string expectedStreet, string expectedBlock) {
         var options = new AddressParseOptions {
@@ -130,13 +130,13 @@ public sealed class RealDataParseTests(RealDataFixture fixture) : IClassFixture<
             SplitRemainder = true, NormalizeNumber = true, BestEffort = true, NormalizeOaza = true,
         };
         var result = await this.Sut.ParseAsync(
-            "ハーベスト株式会社(東京都中央区内の社員食堂) 東京都中央区日本橋本石町1-1-9 地図を見る", options);
+            "株式会社サンプル(東京都中央区内の社員食堂) 東京都中央区日本橋本石町1-2-3 地図を見る", options);
 
         Assert.NotNull(result);
         Assert.Equal("中央区", result.City.Name);
         Assert.Equal("日本橋本石町", result.Town?.Name);
         Assert.Equal("1丁目", result.Street);
-        Assert.Equal("1-9", result.Block);
+        Assert.Equal("2-3", result.Block);
     }
 
     // -------------------------------------------------------
