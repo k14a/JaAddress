@@ -49,6 +49,21 @@ dotnet run --project src/JaAddress.DataBuilder -- --help
 
 出力先は `--output` で指定したディレクトリ（上記例では `./data`）です。
 
+#### アーカイブファイルとして出力する
+
+`--archive` を指定すると、取得したデータを 1 つのアーカイブファイルにまとめて出力します（データを別の環境へ配布する場合など）。
+形式はファイル名の拡張子で決まり、`.tar.gz`（`.tgz`）と `.zip` に対応しています。
+
+```bash
+dotnet run --project src/JaAddress.DataBuilder -- --archive ./ja-address-data.tar.gz
+dotnet run --project src/JaAddress.DataBuilder -- --archive ./ja-address-data.zip
+```
+
+- 新しい一時ディレクトリに取得してからまとめるため、`--output` は使いません（以前のデータの残りが混ざりません）。
+- アーカイブ内のパスは `ja.json`・`ja/{都道府県名}/{市区町村名}.json` です。展開したディレクトリをそのまま `DataDirectory` に指定できます。
+- zip のファイル名は UTF-8（UTF-8 フラグ付き）で格納します。Windows のエクスプローラーではそのまま展開できます。
+  macOS 標準の `unzip` はこのフラグを解釈せず日本語のファイル名が文字化けするため、`ditto -x -k` か `bsdtar -xf` で展開してください。
+
 ### 2. DI への登録
 
 ```csharp
