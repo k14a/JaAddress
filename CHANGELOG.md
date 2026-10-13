@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- DataBuilder：`--archive <ファイル>` オプションを追加。取得したデータを 1 つのアーカイブファイル（`.tar.gz` / `.tgz` / `.zip`、
+  拡張子で判定）にまとめて出力する。新しい一時ディレクトリに取得してからまとめるため、以前のデータの残りが混ざらない。
+- `JaAddress.DataBuilder.Tests`：アーカイブの作成（相対パス・日本語のファイル名の往復、上書き、未対応の拡張子）のテストを追加。
 - 異体字（旧字体・許容字体）の畳み込み機能（`JaAddressOptions.FoldItaiji`、既定 false のオプトイン）。
   有効時、入力住所文字列と住所辞書の名称の双方に変換マップを適用してから照合するため、
   「須惠町」(惠) と「須恵町」(恵) のような字体の揺れを吸収できる（NFKC では畳み込まれない）。

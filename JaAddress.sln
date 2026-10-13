@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JaAddress.Core", "src\JaAdd
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JaAddress.Core.Tests", "tests\JaAddress.Core.Tests\JaAddress.Core.Tests.csproj", "{23BCD7DD-08BB-4AF9-BABB-C8016E6D78F5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JaAddress.DataBuilder.Tests", "tests\JaAddress.DataBuilder.Tests\JaAddress.DataBuilder.Tests.csproj", "{247E2949-D872-4B3C-A973-2DF8611BB2C6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -100,6 +102,18 @@ Global
 		{23BCD7DD-08BB-4AF9-BABB-C8016E6D78F5}.Release|x64.Build.0 = Release|Any CPU
 		{23BCD7DD-08BB-4AF9-BABB-C8016E6D78F5}.Release|x86.ActiveCfg = Release|Any CPU
 		{23BCD7DD-08BB-4AF9-BABB-C8016E6D78F5}.Release|x86.Build.0 = Release|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Debug|x64.Build.0 = Debug|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Debug|x86.Build.0 = Debug|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Release|x64.ActiveCfg = Release|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Release|x64.Build.0 = Release|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Release|x86.ActiveCfg = Release|Any CPU
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -110,5 +124,6 @@ Global
 		{DFD8A6C8-FA02-45EE-B2CC-7D2A1CF36C85} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{F1CFED02-48CE-41AD-852D-E16D0A284531} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{23BCD7DD-08BB-4AF9-BABB-C8016E6D78F5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{247E2949-D872-4B3C-A973-2DF8611BB2C6} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal
