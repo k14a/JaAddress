@@ -37,6 +37,9 @@ dotnet run --project src/JaAddress.DataBuilder -- --output ./data
 
 # データ取得（特定都道府県）
 dotnet run --project src/JaAddress.DataBuilder -- --output ./data --pref 東京都
+
+# データ取得してアーカイブにまとめる（.tar.gz / .tgz / .zip）
+dotnet run --project src/JaAddress.DataBuilder -- --archive ./ja-address-data.tar.gz
 ```
 
 ## Architecture
