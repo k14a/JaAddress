@@ -19,6 +19,12 @@ var prefOption = new Option<string?>("--pref") {
     Required = false,
     Aliases = { "-p" },
 };
+var archiveOption = new Option<string?>("--archive") {
+    Description = "取得したデータを 1 つのアーカイブファイルにまとめて出力する。形式は拡張子で決まる（.tar.gz / .tgz / .zip）。"
+        + "指定時は新しい一時ディレクトリに取得してからまとめるため、--output は使わない（古いファイルが混ざらない）。例: --archive ./ja-address-data.tar.gz",
+    Required = false,
+    Aliases = { "-a" },
+};
 var verboseOption = new Option<bool>("--verbose") {
     Description = "デバッグログを出力する",
     DefaultValueFactory = _ => false,
@@ -27,6 +33,7 @@ var verboseOption = new Option<bool>("--verbose") {
 var rootCommand = new RootCommand("JaAddress データ構築ツール - Geolonia 住所データをローカルに保存します") {
     outputOption,
     prefOption,
+    archiveOption,
     verboseOption,
 };
 
@@ -37,7 +44,13 @@ rootCommand.SetAction((ParseResult parseResult, CancellationToken cancellationTo
     // parseResult から値を取得
     var output  = parseResult.GetValue(outputOption)!;
     var pref    = parseResult.GetValue(prefOption);
+    var archive = parseResult.GetValue(archiveOption);
     var verbose = parseResult.GetValue(verboseOption);
+
+    if (archive is not null && !DataArchiver.IsSupported(archive)) {
+        Console.Error.WriteLine($"対応していないアーカイブ形式です（{string.Join(" / ", DataArchiver.SupportedExtensions)} のみ）: {archive}");
+        return Task.FromResult(1);
+    }
 
     // DI コンテナ構築
     var services = new ServiceCollection();
@@ -55,7 +68,7 @@ rootCommand.SetAction((ParseResult parseResult, CancellationToken cancellationTo
     services.AddSingleton<BuildDataCommand>();
 
     // async ラムダの代わりに Task を返すローカル関数
-    return RunAsync(services, output, pref, cancellationToken);
+    return RunAsync(services, output, pref, archive, cancellationToken);
 });
 
 return await rootCommand.Parse(args).InvokeAsync();
@@ -67,6 +80,7 @@ static async Task<int> RunAsync(
     ServiceCollection services,
     string output,
     string? pref,
+    string? archive,
     CancellationToken cancellationToken)
 {
     await using var provider = services.BuildServiceProvider();
@@ -80,8 +94,18 @@ static async Task<int> RunAsync(
         cts.Cancel();
     };
 
+    // アーカイブを作る場合は、新しい一時ディレクトリに取得してからまとめる
+    var buildDir = archive is null
+        ? output
+        : Path.Combine(Path.GetTempPath(), $"JaAddress.DataBuilder.{Guid.NewGuid():N}");
+
     try {
-        await command.ExecuteAsync(output, pref, cts.Token);
+        await command.ExecuteAsync(buildDir, pref, cts.Token);
+
+        if (archive is not null) {
+            await DataArchiver.CreateAsync(buildDir, archive, cts.Token);
+            logger.LogInformation("アーカイブを作成しました: {Archive}", Path.GetFullPath(archive));
+        }
         return 0;
     } catch (OperationCanceledException) {
         logger.LogWarning("処理がキャンセルされました。");
@@ -89,6 +113,10 @@ static async Task<int> RunAsync(
     } catch (Exception ex) {
         logger.LogError(ex, "予期しないエラーが発生しました。");
         return 1;
+    } finally {
+        if (archive is not null && Directory.Exists(buildDir)) {
+            Directory.Delete(buildDir, recursive: true);
+        }
     }
 }
 
