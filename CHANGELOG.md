@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-12
+
 ### Added
 
 - DataBuilder：`--archive <ファイル>` オプションを追加。取得したデータを 1 つのアーカイブファイル（`.tar.gz` / `.tgz` / `.zip`、
@@ -27,9 +29,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AddressParseResult.Koaza`：`SplitRemainder=true` で町字のあとに小字があれば読み取り、その後ろを丁目・番地として分割する
   （例：`保原町大泉字大地内95-5` → Town「保原町大泉」、Koaza「字大地内」、Block「95-5」。従来は小字と番地を Remainder に残していた）。
   辞書の小字と「字」の有無を問わず照合する。API の `/parse` 応答と TSV 出力に `koaza` を追加。
+- `IAddressService.ParseWithReasonAsync` を追加。解析できなかったときの理由（`AddressParseFailureReason`：`PrefectureNotFound` /
+  `CityNotFound`）を `AddressParseOutcome` で返す。`ParseAsync` の動作は変わらない。
+
+### Changed
+
+- **[破壊的変更]** `Dockerfile.api` の既定の `ASPNETCORE_ENVIRONMENT` を `Development` から `Production` に変更。
+  Swagger UI を使う場合は `-e ASPNETCORE_ENVIRONMENT=Development` を付ける。
+- CI：GitHub Actions を更新（checkout v7 / setup-dotnet v6）し、Dependabot（Docker イメージ・GitHub Actions）を追加。
 
 ### Fixed
 
+- BestEffort 解析で、町名が続けて重複する入力（`東京都港区西麻布西麻布1丁目2番3号`）の丁目・番地が取れない問題を修正。
+- BestEffort 解析で、都道府県名が複数回出てくる入力（`A社(東京都中央区の食堂) 東京都中央区日本橋本石町1-2-3`）の解析に失敗する問題を修正。
+  すべての出現位置から解析し、最も詳細に取れた結果を採用する。
+- 丁目省略形（`都町5-6`）で、辞書にない丁目番号まで丁目として読んでいた問題を修正（Block が `6` になっていた）。
+- `NormalizeOaza=true` で、「大字」を外した一致が、より長く一致する町字より優先されていた問題を修正
+  （`本城東2丁目1-2` が Town「大字本城」になっていた）。
 - 慣習として町村名の前に島名を書いた住所（`東京都八丈島八丈町三根`・`東京都三宅島三宅村坪田`）の市区町村が取れない問題を修正。
   辞書（アドレス・ベース・レジストリ）には島名がないため、島名を読み飛ばす。町村名がなく島名だけの場合（`東京都八丈島三根`）は
   島名を町村名として読み、`Corrected` を true にする。対象は町村名が島名を含まない八丈島（八丈町）・三宅島（三宅村）。
@@ -50,6 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `Microsoft.OpenApi` を推移的依存の 2.4.1 から 2.7.5 へ明示的に引き上げ（`JaAddress.Api`）。
   循環スキーマ参照によるスタックオーバーフローの脆弱性 [GHSA-v5pm-xwqc-g5wc](https://github.com/advisories/GHSA-v5pm-xwqc-g5wc)（高）に対応。
+- Docker イメージを chiseled 版（shell なし）に変更し、root 以外のユーザー（UID 1654）で実行するようにした。ベースイメージは digest で固定。
+  Linux でホストのディレクトリをマウントする場合は `--user` の指定が必要。
 
 ## [0.1.1] - 2026-07-08
 
@@ -95,5 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Geolonia 住所データ取得 CLI（`JaAddress.DataBuilder`）
 - GitHub Actions による CI（ビルド・テスト自動実行）
 
+[Unreleased]: https://github.com/k14a/JaAddress/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/k14a/JaAddress/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/k14a/JaAddress/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/k14a/JaAddress/releases/tag/v0.1.0
