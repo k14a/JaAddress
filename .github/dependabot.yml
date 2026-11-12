@@ -1,0 +1,17 @@
+version: 2
+updates:
+  # Dockerfile / Dockerfile.api のベースイメージ（タグ・digest）を更新する
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # .NET のメジャーバージョン更新は、ブランチを切って検証してから手動で行う
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions のアクションのバージョンを更新する
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
