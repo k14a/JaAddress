@@ -34,6 +34,15 @@ docker run --rm -v "$(pwd)/data:/data" jaaddress-databuilder
 docker run --rm -v "$(pwd)/data:/data" jaaddress-databuilder --pref 東京都
 ```
 
+コンテナは非 root ユーザー（UID 1654）で実行されます。
+Linux でホストのディレクトリをマウントする場合は、書き込めるよう `--user` でホストのユーザーを指定してください
+（Docker Desktop for Mac / Windows では不要です）。
+
+```bash
+mkdir -p data
+docker run --rm --user "$(id -u):$(id -g)" -v "$(pwd)/data:/data" jaaddress-databuilder
+```
+
 #### .NET SDK を使う場合
 
 ```bash

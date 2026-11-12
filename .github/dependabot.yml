@@ -1,0 +1,13 @@
+version: 2
+updates:
+  # Dockerfile / Dockerfile.api のベースイメージ（タグ・digest）を更新する
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # GitHub Actions のアクションのバージョンを更新する
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

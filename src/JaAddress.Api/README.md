@@ -26,14 +26,18 @@ docker build -f Dockerfile.api -t jaaddress-api .
 
 # data/ ディレクトリをマウントして起動
 docker run -p 8080:8080 -v "$(pwd)/data:/data:ro" jaaddress-api
+
+# Swagger UI を有効にして起動（開発・動作確認用）
+docker run -p 8080:8080 -v "$(pwd)/data:/data:ro" -e ASPNETCORE_ENVIRONMENT=Development jaaddress-api
 ```
 
-起動後、`http://localhost:8080/swagger` で Swagger UI を確認できます。
+`ASPNETCORE_ENVIRONMENT=Development` を指定して起動した場合、`http://localhost:8080/swagger` で Swagger UI を確認できます。
+Development ではエラー時に詳細な例外情報が返されるため、公開環境では指定しないでください。
 
 | 環境変数 | 既定値 | 説明 |
 |---------|-------|------|
 | `JaAddress__DataDirectory` | `/data` | 町字データディレクトリのパス |
-| `ASPNETCORE_ENVIRONMENT` | `Development` | `Development` の場合のみ Swagger UI が有効 |
+| `ASPNETCORE_ENVIRONMENT` | `Production` | `Development` の場合のみ Swagger UI が有効 |
 | `ASPNETCORE_URLS` | `http://+:8080` | リッスンするアドレス・ポート |
 
 ---
