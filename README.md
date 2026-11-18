@@ -1,6 +1,6 @@
 # JaAddress
 
-日本の住所を正規化・分解する .NET 10 ライブラリ。
+日本の住所を正規化・分解する .NET ライブラリ（.NET 8 以降）。
 
 [geolonia/normalize-japanese-addresses](https://github.com/geolonia/normalize-japanese-addresses) の C# 移植版。
 
@@ -17,9 +17,33 @@
 
 ## はじめに
 
+### 0. インストール
+
+NuGet パッケージ [JaAddress](https://www.nuget.org/packages/JaAddress) を追加します。
+
+```bash
+dotnet add package JaAddress
+```
+
 ### 1. データの準備
 
-`JaAddress.DataBuilder` で住所データを取得します。
+`JaAddress.DataBuilder` で住所データを取得します（パッケージには住所データは含まれません）。
+
+#### dotnet tool を使う場合
+
+[JaAddress.DataBuilder](https://www.nuget.org/packages/JaAddress.DataBuilder) は dotnet tool として公開しています（.NET 8 以降のランタイムで動作）。
+
+```bash
+dotnet tool install -g JaAddress.DataBuilder
+
+# 全都道府県を取得してカレントディレクトリの data/ に保存
+jaaddress-databuilder --output ./data
+
+# 特定の都道府県のみ
+jaaddress-databuilder --output ./data --pref 東京都
+```
+
+以下の Docker・.NET SDK の手順で使う `--output`・`--pref`・`--archive` などのオプションは、dotnet tool でも同じです。
 
 #### Docker を使う場合（.NET SDK 不要）
 

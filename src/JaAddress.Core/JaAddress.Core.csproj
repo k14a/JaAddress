@@ -1,10 +1,24 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
+
+  <!-- NuGet パッケージ（共通の情報は Directory.Build.props） -->
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>JaAddress</PackageId>
+    <Description>日本の住所文字列を都道府県・市区町村・町字・丁目・番地に分けて正規化する .NET ライブラリ。geolonia/normalize-japanese-addresses の C# 移植版。住所データは含まないため、JaAddress.DataBuilder で別に取得する。</Description>
+    <PackageTags>japan;japanese;address;normalize;parser;geolonia</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />

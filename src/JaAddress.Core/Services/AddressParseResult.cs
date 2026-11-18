@@ -2,8 +2,11 @@ using JaAddress.Core.Models;
 
 namespace JaAddress.Core.Services;
 
+/// <summary>住所の解析結果。</summary>
 public sealed class AddressParseResult {
+    /// <summary>特定できた都道府県。</summary>
     public Prefecture Prefecture { get; init; } = null!;
+    /// <summary>特定できた市区町村。</summary>
     public City City { get; init; } = null!;
     /// <summary>町字まで分割できた場合</summary>
     public Town? Town { get; init; }

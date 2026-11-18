@@ -1,0 +1,70 @@
+name: Publish
+
+# v0.3.0 のようなタグを push したら、JaAddress と JaAddress.DataBuilder を nuget.org に公開する。
+# 認証は Trusted Publishing（GitHub の OIDC トークンを短時間だけ有効な API キーに交換する）を使うため、API キーは保存しない。
+# 事前準備:
+#   - nuget.org の Trusted Publishing に、所有者 k14a.net（Organization）・リポジトリ k14a/JaAddress・
+#     ワークフロー publish.yml・環境 nuget を登録する
+#   - GitHub のリポジトリ変数 NUGET_USER に、k14a.net のメンバーである個人の nuget.org ユーザー名
+#     （プロフィール名。Organization 名やメールアドレスではない）を設定する
+
+on:
+  push:
+    tags: [ "v*" ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: nuget
+    permissions:
+      contents: read
+      id-token: write   # Trusted Publishing で OIDC トークンを取得するために必要
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Check version
+        run: |
+          version=$(dotnet msbuild src/JaAddress.Core/JaAddress.Core.csproj -getProperty:Version)
+          if [ "v${version}" != "${GITHUB_REF_NAME}" ]; then
+            echo "::error::タグ ${GITHUB_REF_NAME} と Directory.Build.props の Version（${version}）が一致しません"
+            exit 1
+          fi
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release
+
+      - name: Pack
+        run: |
+          dotnet pack src/JaAddress.Core --no-build --configuration Release --output artifacts
+          dotnet pack src/JaAddress.DataBuilder --no-build --configuration Release --output artifacts
+
+      - name: NuGet login
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push
+        # .nupkg と同じディレクトリにある .snupkg（シンボルパッケージ）も一緒に公開される
+        run: >
+          dotnet nuget push "artifacts/*.nupkg"
+          --api-key "${{ steps.login.outputs.NUGET_API_KEY }}"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

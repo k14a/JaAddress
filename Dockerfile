@@ -1,8 +1,9 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0-noble@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS build
 WORKDIR /src
 COPY . .
+# DataBuilder は net8.0 と net10.0 を対象にしているため、実行イメージに合わせて net10.0 を指定する
 RUN dotnet publish src/JaAddress.DataBuilder/JaAddress.DataBuilder.csproj \
-    -c Release -o /app/publish --no-self-contained
+    -c Release -f net10.0 -o /app/publish --no-self-contained
 # chiseled イメージには shell がないため、出力先ディレクトリはビルドステージで作成する
 RUN mkdir /data
 
