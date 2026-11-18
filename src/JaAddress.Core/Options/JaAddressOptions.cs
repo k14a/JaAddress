@@ -1,5 +1,8 @@
 namespace JaAddress.Core.Options;
 
+/// <summary>
+/// JaAddress 全体の設定。<see cref="ServiceCollectionExtensions.AddJaAddress"/> に渡す。
+/// </summary>
 public sealed class JaAddressOptions {
     /// <summary>DataBuilderが出力したデータディレクトリのパス</summary>
     public string DataDirectory { get; init; } = string.Empty;

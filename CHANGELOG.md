@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-18
+
+### Added
+
+- NuGet パッケージとして公開する準備。`JaAddress.Core` をパッケージ ID `JaAddress` として、
+  `JaAddress.DataBuilder` を dotnet tool `JaAddress.DataBuilder`（コマンド名 `jaaddress-databuilder`）としてパッケージにする。
+  共通の情報は `Directory.Build.props`、パッケージ用の README は各プロジェクト直下の `README.md`。
+  シンボルパッケージ（`.snupkg`）と SourceLink に対応。
+- `.github/workflows/publish.yml`：`v*` のタグを push すると、Trusted Publishing で nuget.org に公開する。
+- `JaAddress.Core` の公開 API に XML ドキュメントコメントを追加し、パッケージにドキュメントファイルを含める。
+
+### Changed
+
+- `JaAddress.Core`・`JaAddress.DataBuilder` の対象を `net8.0;net10.0` に広げた（.NET 8 以降で利用可能）。
+  テストも両方のフレームワークで実行し、CI に .NET 8 を追加した。
+- DataBuilder：.NET 8 では、zip のアーカイブを同期版の `ZipFile.CreateFromDirectory` で作成する（非同期版は .NET 10 以降のみ）。
+- DataBuilder の Dockerfile：対象フレームワークが複数になったため、`dotnet publish` に `-f net10.0` を指定する。
+
 ## [0.2.0] - 2026-11-12
 
 ### Added
@@ -113,7 +131,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Geolonia 住所データ取得 CLI（`JaAddress.DataBuilder`）
 - GitHub Actions による CI（ビルド・テスト自動実行）
 
-[Unreleased]: https://github.com/k14a/JaAddress/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/k14a/JaAddress/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/k14a/JaAddress/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/k14a/JaAddress/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/k14a/JaAddress/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/k14a/JaAddress/releases/tag/v0.1.0

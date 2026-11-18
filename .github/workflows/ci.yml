@@ -19,7 +19,10 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          # JaAddress.Core / DataBuilder は net8.0 と net10.0 を対象にしているため、両方のランタイムでテストする
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
       - name: Restore
         run: dotnet restore

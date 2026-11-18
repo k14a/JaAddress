@@ -46,7 +46,8 @@ public sealed class DataArchiverTests : IDisposable {
         var extractDir = Path.Combine(this._workDir, "extract");
         Directory.CreateDirectory(extractDir);
         if (archiveName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
-            await ZipFile.ExtractToDirectoryAsync(archivePath, extractDir);
+            // .NET 8 には非同期版がないため、両方で使える同期版で展開する
+            ZipFile.ExtractToDirectory(archivePath, extractDir);
         } else {
             await using var file = File.OpenRead(archivePath);
             await using var gzip = new GZipStream(file, CompressionMode.Decompress);
