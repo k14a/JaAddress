@@ -39,7 +39,12 @@ internal static class DataArchiver {
         try {
             if (fullPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)) {
                 // ファイル名に日本語を含むため、エントリ名は UTF-8（UTF-8 フラグ付き）で書き込まれる
+#if NET10_0_OR_GREATER
                 await ZipFile.CreateFromDirectoryAsync(sourceDir, tempPath, CompressionLevel.SmallestSize, includeBaseDirectory: false, ct);
+#else
+                // .NET 8 には非同期版がないため、同期版をスレッドプールで実行する（開始前のキャンセルのみ反映される）
+                await Task.Run(() => ZipFile.CreateFromDirectory(sourceDir, tempPath, CompressionLevel.SmallestSize, includeBaseDirectory: false), ct);
+#endif
             } else {
                 await using var file = File.Create(tempPath);
                 await using var gzip = new GZipStream(file, CompressionLevel.SmallestSize);

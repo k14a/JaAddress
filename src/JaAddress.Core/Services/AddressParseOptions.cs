@@ -1,5 +1,8 @@
 namespace JaAddress.Core.Services;
 
+/// <summary>
+/// 住所解析 1 回ごとの設定。<see cref="IAddressService.ParseAsync"/> などに渡す。
+/// </summary>
 public sealed class AddressParseOptions {
     /// <summary>町字・Street・Blockまで分割するか（falseならRemainderのみ）</summary>
     public bool SplitRemainder { get; init; } = false;

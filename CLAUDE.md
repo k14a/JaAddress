@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-JaAddress は日本の住所を正規化する .NET 10 ライブラリ。[geolonia/normalize-japanese-addresses](https://github.com/geolonia/normalize-japanese-addresses) の C# 移植版。
+JaAddress は日本の住所を正規化する .NET ライブラリ（`JaAddress.Core` と `JaAddress.DataBuilder` は net8.0 と net10.0 を対象にする）。[geolonia/normalize-japanese-addresses](https://github.com/geolonia/normalize-japanese-addresses) の C# 移植版。
 
 住所データは Geolonia 住所データ v2（アドレス・ベース・レジストリ由来、CC BY 4.0）を使用。
 
@@ -43,13 +43,30 @@ dotnet run --project src/JaAddress.DataBuilder -- --output ./data --pref 東京�
 dotnet run --project src/JaAddress.DataBuilder -- --archive ./ja-address-data.tar.gz
 ```
 
+## .NET 8 対応の注意
+
+`JaAddress.Core`・`JaAddress.DataBuilder` と、それらのテストプロジェクトは `net8.0;net10.0` を対象にしている
+（`JaAddress.Api` と `JaAddress.Api.Tests` は net10.0 のみ）。
+
+- .NET 9 以降にしかない API を使う場合は `#if NET10_0_OR_GREATER` で分けるか、.NET 8 でも使える書き方にする。
+- ローカルに .NET 8 ランタイムがない場合、`dotnet test` は net8.0 のテストを実行できない。
+  net10.0 だけ実行するには `dotnet test -f net10.0` を使う。CI では両方を実行する。
+
+## NuGet パッケージとリリース
+
+- `JaAddress.Core` はパッケージ ID `JaAddress`、`JaAddress.DataBuilder` は dotnet tool `JaAddress.DataBuilder`（コマンド名 `jaaddress-databuilder`）として nuget.org に公開する。
+- パッケージ共通の情報と `Version` は `Directory.Build.props` にある。パッケージ用の README は各プロジェクト直下の `README.md`。
+- リリース手順: `Directory.Build.props` の `Version` と CHANGELOG を更新し、main にマージしてから `v{Version}` のタグを push する。
+  `.github/workflows/publish.yml` が Trusted Publishing で nuget.org に公開する（タグと `Version` が一致しない場合は失敗する）。
+- 一度公開した版は削除できない（非表示にできるだけ）。
+
 ## Architecture
 
 ### プロジェクト構成
 
 - **`JaAddress.Core`** — 実装の中心。`IAddressService` / `AddressService`、モデル、`AddressParseOptions`、`AddressParseResult`。`AddJaAddress()` 拡張メソッドでDI登録。
 - **`JaAddress.Api`** — ASP.NET Core Minimal API。`/parse`（GET/POST/TSV）と `/prefectures` エンドポイント。Swagger UI あり。
-- **`JaAddress.DataBuilder`** — Geolonia API からデータを取得してローカル JSON として保存する CLI（`System.CommandLine`）。
+- **`JaAddress.DataBuilder`** — Geolonia API からデータを取得してローカル JSON として保存する CLI（`System.CommandLine`）。dotnet tool として配布する。
 - **`JaAddress.Domain` / `JaAddress.Application` / `JaAddress.Infrastructure`** — 現時点ではスタブ（`Class1.cs` のみ）。将来の拡張用。
 
 ### データフロー
