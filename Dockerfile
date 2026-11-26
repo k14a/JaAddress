@@ -8,7 +8,7 @@ RUN dotnet publish src/JaAddress.DataBuilder/JaAddress.DataBuilder.csproj \
 RUN mkdir /data
 
 # shell・パッケージマネージャを含まず、非 root ユーザー（app）で実行される chiseled イメージを使用する
-FROM mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled@sha256:1b234cef150624fe8cc7d027e8d742c0f03a16aef2484dc469eb8c872167255e
+FROM mcr.microsoft.com/dotnet/runtime:10.0-noble-chiseled@sha256:d7841dcba3234bd757f835cdaf03de1cae42b301e7f19677cd87a7bbc2064b27
 WORKDIR /app
 COPY --from=build /app/publish .
 COPY --from=build --chown=$APP_UID:$APP_UID /data /data
