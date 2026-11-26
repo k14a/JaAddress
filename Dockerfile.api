@@ -6,7 +6,7 @@ RUN dotnet publish src/JaAddress.Api/JaAddress.Api.csproj \
 
 # 非 root ユーザー（app）で実行される chiseled イメージを使用する
 # JaAddress.Core はカルチャ依存の文字列比較を行うため、ICU を含む -extra を使用する
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:cae5b962bfb786606def03d250c6a645cc98839095c89e806e4bd8978a68115b
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra@sha256:c8dd08a50d8ffd19bd8da72edee05a7ac15b486a5b1869cf46fdb370bf1fbc76
 WORKDIR /app
 COPY --from=build /app/publish .
 
